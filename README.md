@@ -60,7 +60,6 @@ all my projects use a simplified approach:
 ## Using this repo
 
 ```sh
-./install.sh --skill                 # install /kproject-init to ~/.claude/skills
 ./install.sh --agent both ~/src/x    # apply harness to a repo (claude|ghcp|both)
 just apply ~/src/x                   # same, via just
 ```
@@ -73,9 +72,16 @@ just apply ~/src/x                   # same, via just
 - `install.sh` is idempotent and mechanical: layout dirs, seed
   `roadmap.md`/`justfile`, `.gitignore` entries, block injection, and warnings
   when old-harness paths (`.specify/`, `specs/`, ...) are present.
-- `/kproject-init` (in `skills/`) is the judgment layer: run it inside a repo
-  to survey old harnesses, migrate their content into `sprints/`, apply the
-  installer, and write the project-specific section of the agent files.
+- `/kproject-init` is the judgment layer: run it inside a repo (or point it at
+  a new one) to scaffold from scratch or survey an old harness, migrate its
+  content into `sprints/`, apply the installer, and write the project-specific
+  section of the agent files.
+
+  **The skill does not live here.** Its source is the `agent-skills` repo, and
+  it reaches machines through k-homelab's `claude-skills` recipe on managed
+  hosts or `bin/deploy-skill` on unmanaged ones. This repo owns the *harness*;
+  that repo owns the *skill*. Keeping a second copy here is what let the two
+  drift apart before.
 
 ## License
 

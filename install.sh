@@ -3,8 +3,10 @@
 #
 # Usage:
 #   install.sh [--agent claude|ghcp|both] TARGET_DIR
-#   install.sh --skill              # install /kproject-init to ~/.claude/skills
-#   install.sh --skill TARGET_DIR   # both
+#
+# The /kproject-init skill is NOT installed from here. It lives in the
+# agent-skills repo and reaches machines via k-homelab's claude-skills recipe
+# (managed hosts) or bin/deploy-skill (unmanaged ones). One source, one path.
 #
 # Idempotent: layout pieces are only created if missing, and the agent
 # instruction files get a managed block between kproject:begin/end markers
@@ -17,18 +19,16 @@ BEGIN_MARK='<!-- kproject:begin — managed by kprojects/install.sh; do not edit
 END_MARK='<!-- kproject:end -->'
 
 usage() {
-    sed -n '2,8p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '2,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
     exit "${1:-1}"
 }
 
 AGENT=both
-DO_SKILL=0
 TARGET=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --agent) AGENT="${2:?--agent needs claude|ghcp|both}"; shift 2 ;;
-        --skill) DO_SKILL=1; shift ;;
         -h|--help) usage 0 ;;
         -*) echo "unknown option: $1" >&2; usage ;;
         *) TARGET="$1"; shift ;;
@@ -36,13 +36,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$AGENT" in claude|ghcp|both) ;; *) echo "invalid --agent: $AGENT" >&2; usage ;; esac
-
-install_skill() {
-    local dest="$HOME/.claude/skills/kproject-init"
-    mkdir -p "$dest"
-    cp "$KPROJECTS_DIR/skills/kproject-init/SKILL.md" "$dest/SKILL.md"
-    echo "skill    : installed /kproject-init -> $dest"
-}
 
 # Replace (or append/create) the managed block in an agent instruction file.
 inject_block() {
@@ -105,10 +98,7 @@ warn_old_harness() {
     fi
 }
 
-[[ $DO_SKILL -eq 1 ]] && install_skill
-
 if [[ -z "$TARGET" ]]; then
-    [[ $DO_SKILL -eq 1 ]] && exit 0
     usage
 fi
 

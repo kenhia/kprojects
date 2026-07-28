@@ -6,10 +6,6 @@ default:
 apply target agent="both":
     ./install.sh --agent {{agent}} {{target}}
 
-# Install the /kproject-init skill into ~/.claude/skills
-install-skill:
-    ./install.sh --skill
-
 # Run CI gates
 check:
     bash -n install.sh
