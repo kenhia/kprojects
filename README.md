@@ -76,3 +76,7 @@ just apply ~/src/x                   # same, via just
 - `/kproject-init` (in `skills/`) is the judgment layer: run it inside a repo
   to survey old harnesses, migrate their content into `sprints/`, apply the
   installer, and write the project-specific section of the agent files.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
