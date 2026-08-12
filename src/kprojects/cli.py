@@ -34,7 +34,7 @@ END_PREFIX = "<!-- kproject:end"
 
 TOOLING_PLACEHOLDER = "{{TOOLING}}"
 
-STACKS = ("python", "rust", "other")
+STACKS = ("python", "rust", "go", "other")
 AGENTS = ("claude", "ghcp", "both")
 
 AGENT_FILES = {
@@ -43,14 +43,20 @@ AGENT_FILES = {
     "both": ("CLAUDE.md", ".github/copilot-instructions.md"),
 }
 
-# Ordered: a repo carrying both is treated as the one whose toolchain owns the
-# build, and cargo is the stricter gate of the two.
-STACK_MARKERS = (("rust", "Cargo.toml"), ("python", "pyproject.toml"))
+# Ordered: a repo carrying more than one is treated as the one whose toolchain
+# owns the build. Cargo stays first — it is the stricter gate. `pyproject.toml`
+# is last because it is the weakest signal of the three: `Cargo.toml` and
+# `go.mod` define a build, `pyproject.toml` also shows up carrying nothing but
+# ruff settings in repos that are not Python projects at all.
+STACK_MARKERS = (("rust", "Cargo.toml"), ("go", "go.mod"), ("python", "pyproject.toml"))
 
 BASE_IGNORES = (".scratch/", ".env")
 STACK_IGNORES = {
     "python": (".venv/", "__pycache__/", ".pytest_cache/"),
     "rust": ("target/",),
+    # `go.work` is per-machine by design (upstream guidance is not to commit it);
+    # `*.test` and `*.out` are `go test -c` binaries and profile output.
+    "go": ("*.exe", "*.test", "*.out", "go.work", "go.work.sum"),
     "other": (),
 }
 

@@ -55,9 +55,16 @@ kprojects is the harness itself: single-source agent conventions plus the
   `uvx --from git+https://github.com/kenhia/kprojects kproject-install .`
   Never resolve templates relative to `__file__` — that adjacency assumption
   was the bug (#699) that made the old bash installer non-portable.
-- Stack is **detected** from the target repo (`Cargo.toml` → rust,
-  `pyproject.toml` → python, else other); `--stack` overrides. It is not
-  defaulted, deliberately: see sprint 002.
+- Stack is **detected** from the target repo (`Cargo.toml` → rust, `go.mod` →
+  go, `pyproject.toml` → python, else other); `--stack` overrides. It is not
+  defaulted, deliberately: see sprint 002. `STACK_MARKERS` order decides a
+  polyglot repo — `pyproject.toml` is deliberately last, since it also appears
+  carrying nothing but ruff config.
+- Adding a stack is one `STACKS` value, one `STACK_MARKERS` entry, one
+  `STACK_IGNORES` entry (`()` is valid) and two files —
+  `harness/tooling/<stack>.md` + `harness/justfile.<stack>`. The
+  `test_harness_ships_with_the_package` test iterates `STACKS`, so it fails
+  until both files exist: that test is the registration check.
 - Block markers are matched on the `<!-- kproject:begin` **prefix**, never
   the full line, so repos carrying a block from the retired `install.sh`
   re-apply cleanly with no migration step.
