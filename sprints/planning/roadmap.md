@@ -6,11 +6,11 @@
 ## Now
 
 - Installer is portable and stack-aware (sprint 002): `kproject-install` run
-  via `uvx`, harness shipped as package data, stack detected from the target
-- Run the `uvx --from git+https://…` form from a clean machine once 002 is on
-  `main` — the last unverified line of #699
+  via `uvx`, harness shipped as package data, stack detected from the target.
+  Verified end to end from `git+https` on both kai and cleo.
 - Point `/kproject-init` at the new invocation and add the greenfield stack
-  question (agent-skills #1184; program 1103 slice 2)
+  question (agent-skills #1184; program 1103 slice 2) — until that lands,
+  nothing passes `--stack`, so stack-awareness is only reachable by hand
 
 ## Next
 

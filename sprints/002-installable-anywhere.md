@@ -132,16 +132,22 @@ correct. Re-applied over a CRLF copy carrying a hand-written note outside the
 block — 45 CRLF in, 45 CRLF out, zero bare LF, note intact, exactly one
 begin/end marker pair, and run 3 hashed identical to run 2.
 
-**Not yet verified:** the literal
-`uvx --from git+https://github.com/kenhia/kprojects …` form, which needs this
-branch on the remote. Everything downstream of uv's git clone — build from
-source, entry point, resource loading — is covered by the runs above, but the
-first post-merge action should be that exact command from a clean machine.
+**The literal one-command form, on both.** Once the branch was pushed, the
+exact command from #699's definition of done was run against throwaway repos
+on kai and on cleo:
+
+```
+uvx --from git+https://github.com/kenhia/kprojects kproject-install <repo>
+```
+
+Both cloned from GitHub, built, and applied the harness with no kprojects
+checkout on the machine. cleo detected `rust` from a `Cargo.toml` and wrote
+the cargo stanza and cargo justfile. That closes every line of #699's DoD
+except the `/kproject-init` absolute path, which moved to agent-skills #1184
+by design.
 
 ## Follow-ups
 
-- Run `uvx --from git+https://github.com/kenhia/kprojects kproject-install`
-  once this lands on `main`, closing the last line of #699's DoD.
 - Re-apply to the eight other repos already on the harness so they pick up the
   URL fix and the new marker text. That is rollout, which is proposal 749's
   job, not this sprint's.
