@@ -66,9 +66,11 @@ uvx --from git+https://github.com/kenhia/kprojects kproject-install ~/src/x
 ```
 
 Flags: `--agent claude|ghcp|both` (default `both`) and `--stack
-python|rust|other`. Leave `--stack` off and the target repo is inspected —
-`Cargo.toml` means rust, `pyproject.toml` means python, anything else is
-other. From a clone of this repo, `just apply ~/src/x` does the same.
+python|rust|go|other`. Leave `--stack` off and the target repo is inspected —
+`Cargo.toml` means rust, `go.mod` means go, `pyproject.toml` means python,
+anything else is other (checked in that order, so a repo carrying more than
+one marker gets the toolchain that owns its build). From a clone of this repo,
+`just apply ~/src/x` does the same.
 
 - `src/kprojects/harness/` — the single source for shared conventions.
   `instructions.md` is what every project gets; `tooling/<stack>.md` is the

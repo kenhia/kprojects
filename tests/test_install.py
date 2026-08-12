@@ -49,6 +49,8 @@ def test_rendered_block_carries_the_stack_specific_stanza():
     assert "ruff" in cli.render_block("python")
     assert "ruff" not in cli.render_block("rust")
     assert "cargo clippy --all-targets" in cli.render_block("rust")
+    assert "gofmt" in cli.render_block("go")
+    assert "ruff" not in cli.render_block("go")
     assert "cargo" not in cli.render_block("other")
 
 
@@ -155,9 +157,27 @@ def test_detects_other_when_nothing_matches(repo: Path):
     assert cli.detect_stack(repo) == "other"
 
 
+def test_detects_go_from_go_mod(repo: Path):
+    (repo / "go.mod").write_text("module example.com/x\n")
+    assert cli.detect_stack(repo) == "go"
+
+
 def test_cargo_wins_when_a_repo_carries_both(repo: Path):
     (repo / "Cargo.toml").write_text("[package]\n")
     (repo / "pyproject.toml").write_text("[project]\n")
+    assert cli.detect_stack(repo) == "rust"
+
+
+def test_go_mod_wins_over_pyproject(repo: Path):
+    """`pyproject.toml` is the weakest marker — it doubles as tool config."""
+    (repo / "go.mod").write_text("module example.com/x\n")
+    (repo / "pyproject.toml").write_text("[project]\n")
+    assert cli.detect_stack(repo) == "go"
+
+
+def test_cargo_wins_over_go_mod(repo: Path):
+    (repo / "Cargo.toml").write_text("[package]\n")
+    (repo / "go.mod").write_text("module example.com/x\n")
     assert cli.detect_stack(repo) == "rust"
 
 
@@ -190,6 +210,10 @@ def test_gitignore_gets_stack_entries(repo: Path):
     assert "__pycache__/" in lines
     cli.ensure_gitignore(repo, "rust")
     assert "target/" in (repo / ".gitignore").read_text().splitlines()
+    cli.ensure_gitignore(repo, "go")
+    lines = (repo / ".gitignore").read_text().splitlines()
+    assert "*.test" in lines
+    assert "go.work" in lines
 
 
 def test_gitignore_does_not_duplicate_on_rerun(repo: Path):
@@ -221,6 +245,25 @@ def test_seeds_the_justfile_for_the_stack(repo: Path):
     (repo / "pyproject.toml").write_text("[project]\n")
     cli.main(["--agent", "claude", str(repo)])
     assert "uv run ruff format --check ." in (repo / "justfile").read_text()
+
+
+def test_seeds_the_go_justfile_when_go_mod_is_present(repo: Path):
+    (repo / "go.mod").write_text("module example.com/x\n")
+    cli.main(["--agent", "claude", str(repo)])
+    text = (repo / "justfile").read_text()
+    assert "go vet ./..." in text
+    assert "go test ./..." in text
+
+
+def test_go_gate_does_not_trust_gofmt_exit_status():
+    """`gofmt -l` prints offenders and exits 0 — a bare call is a gate that lies.
+
+    Same class of trap as `clippy` without `--all-targets`. The gate must
+    assert on gofmt's *output*, so it has to capture it.
+    """
+    check = cli._read_harness("justfile.go").split("check:")[1].split("\n\n")[0]
+    assert "gofmt -l" in check
+    assert "$(gofmt -l" in check, "gate must capture gofmt output, not just run it"
 
 
 def test_never_overwrites_an_existing_justfile_or_roadmap(repo: Path):
