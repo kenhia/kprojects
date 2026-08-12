@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kprojects"
+version = "0.2.0"
+description = "The kproject minimal agent harness, and the installer that applies it to a repo"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Ken Hiatt" }]
+dependencies = []
+
+[project.scripts]
+kproject-install = "kprojects.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/kenhia/kprojects"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "ty"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kprojects"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/kprojects", "tests", "README.md", "LICENSE"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

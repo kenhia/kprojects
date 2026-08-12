@@ -5,18 +5,27 @@
 
 ## Now
 
-- First cut shipped: harness/, install.sh, /kproject-init skill (sprint 001)
-- Try `/kproject-init` on 1–2 real projects; fix what chafes
+- Installer is portable and stack-aware (sprint 002): `kproject-install` run
+  via `uvx`, harness shipped as package data, stack detected from the target
+- Run the `uvx --from git+https://…` form from a clean machine once 002 is on
+  `main` — the last unverified line of #699
+- Point `/kproject-init` at the new invocation and add the greenfield stack
+  question (agent-skills #1184; program 1103 slice 2)
 
 ## Next
 
+- Harness survey and rollout across cleo/kai/kubs0 (proposal 749): route every
+  Ken-owned repo to kprojects, working-skill-repo, or deliberately bare
+- Re-apply to the repos already on the harness so they pick up the repo-URL
+  fix and the new marker text
 - Sharpen old-harness detection in the skill (exact ATV-Starter Kit and
   Phoenix footprints, learned from real migrations)
-- GHCP-side equivalent of the init flow (prompt file in `.github/prompts/`?)
+- Try `/kproject-init` on 1–2 real projects; fix what chafes
 
 ## Later / Ideas
 
-- Promote instructions/skills to global/user scope once stable (for now
-  everything stays in-repo so a GH checkout carries its own setup)
+- More stacks if they earn one (go, node) — the per-stack template split makes
+  adding one cheap, so wait for a real project rather than pre-building
+- GHCP-side equivalent of the init flow (prompt file in `.github/prompts/`?)
 - Single-source generation if CLAUDE.md / copilot-instructions.md drift
   becomes a real problem (see kagent-harness for prior art)

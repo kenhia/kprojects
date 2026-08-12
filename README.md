@@ -59,19 +59,32 @@ all my projects use a simplified approach:
 
 ## Using this repo
 
+From **any machine, Windows or Linux, with no clone of this repo**:
+
 ```sh
-./install.sh --agent both ~/src/x    # apply harness to a repo (claude|ghcp|both)
-just apply ~/src/x                   # same, via just
+uvx --from git+https://github.com/kenhia/kprojects kproject-install ~/src/x
 ```
 
-- `harness/instructions.md` — the single source for shared conventions.
-  `install.sh` injects it into `CLAUDE.md` / `.github/copilot-instructions.md`
-  as a managed block (`kproject:begin`/`end` markers) and replaces that block
-  on re-run; anything outside the block is project-specific and never touched.
-  After editing conventions, re-run `./install.sh <repo>` on affected repos.
-- `install.sh` is idempotent and mechanical: layout dirs, seed
+Flags: `--agent claude|ghcp|both` (default `both`) and `--stack
+python|rust|other`. Leave `--stack` off and the target repo is inspected —
+`Cargo.toml` means rust, `pyproject.toml` means python, anything else is
+other. From a clone of this repo, `just apply ~/src/x` does the same.
+
+- `src/kprojects/harness/` — the single source for shared conventions.
+  `instructions.md` is what every project gets; `tooling/<stack>.md` is the
+  stanza composed into it per stack; `justfile.<stack>` is the seeded gate.
+  The installer injects the result into `CLAUDE.md` /
+  `.github/copilot-instructions.md` as a managed block (`kproject:begin`/`end`
+  markers) and replaces that block on re-run; anything outside the block is
+  project-specific and never touched. After editing conventions, re-run the
+  installer on affected repos.
+- The harness travels *inside the package*, which is what makes the one-command
+  install true — there is no cached clone to manage and nothing to place by
+  hand.
+- The installer is idempotent and mechanical: layout dirs, seed
   `roadmap.md`/`justfile`, `.gitignore` entries, block injection, and warnings
-  when old-harness paths (`.specify/`, `specs/`, ...) are present.
+  when old-harness paths (`.specify/`, `specs/`, ...) are present. It preserves
+  CRLF line endings, so a Windows checkout survives re-application.
 - `/kproject-init` is the judgment layer: run it inside a repo (or point it at
   a new one) to scaffold from scratch or survey an old harness, migrate its
   content into `sprints/`, apply the installer, and write the project-specific

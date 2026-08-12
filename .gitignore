@@ -1,2 +1,7 @@
 .scratch/
 .env
+.korg-sprint-proposal
+dist/
+.venv/
+__pycache__/
+.pytest_cache/

@@ -1,8 +1,8 @@
 ## kproject conventions
 
 This project uses the kproject minimal harness
-(`~/src/ai-agents/kprojects`). Keep context small; prefer doing over
-ceremony.
+(<https://github.com/kenhia/kprojects>). Keep context small; prefer doing
+over ceremony.
 
 ### Layout
 
@@ -31,6 +31,5 @@ ceremony.
 
 ### Tooling preferences
 
-- Python managed by `uv`; lint/format with `ruff`; typecheck with `ty`
-  (astral toolchain)
+{{TOOLING}}
 - License is MIT unless specifically directed otherwise
