@@ -1,0 +1,13 @@
+# List available recipes
+default:
+    @just --list
+
+# Run CI gates (lint, typecheck, tests)
+check:
+    cargo fmt --check
+    cargo clippy --all-targets -- -D warnings
+    cargo test
+
+# Apply formatting
+fmt:
+    cargo fmt

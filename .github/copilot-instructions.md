@@ -1,9 +1,9 @@
-<!-- kproject:begin — managed by kprojects/install.sh; do not edit inside this block -->
+<!-- kproject:begin — managed by kprojects; do not edit inside this block -->
 ## kproject conventions
 
 This project uses the kproject minimal harness
-(`~/src/ai-agents/kprojects`). Keep context small; prefer doing over
-ceremony.
+(<https://github.com/kenhia/kprojects>). Keep context small; prefer doing
+over ceremony.
 
 ### Layout
 
@@ -40,15 +40,30 @@ ceremony.
 ## Project
 
 kprojects is the harness itself: single-source agent conventions plus the
-tooling to apply them to other repos.
+`kproject-install` CLI that applies them to other repos.
 
-- `harness/instructions.md` is the only place shared conventions are
-  edited. The managed blocks in this file and in downstream repos are
-  regenerated from it by `./install.sh <repo>` — after editing, re-run
-  `./install.sh .` here and on affected repos. Never edit inside a
+- `src/kprojects/harness/` holds the templates and is the only place shared
+  conventions are edited — `instructions.md` for what every project gets,
+  `tooling/<stack>.md` for the per-stack stanza composed in at the
+  `{{TOOLING}}` placeholder, `justfile.<stack>` for the seeded gate. The
+  managed blocks in this file and in downstream repos are regenerated from
+  them; after editing, run `just apply-self` here and re-run
+  `kproject-install` on affected repos. Never edit inside a
   `kproject:begin`/`kproject:end` block by hand.
-- `skills/kproject-init/SKILL.md` is the migration/init skill; deploy with
-  `./install.sh --skill` (copies to `~/.claude/skills/`).
+- The harness ships as **package data**, which is what lets the installer run
+  from any machine with no clone:
+  `uvx --from git+https://github.com/kenhia/kprojects kproject-install .`
+  Never resolve templates relative to `__file__` — that adjacency assumption
+  was the bug (#699) that made the old bash installer non-portable.
+- Stack is **detected** from the target repo (`Cargo.toml` → rust,
+  `pyproject.toml` → python, else other); `--stack` overrides. It is not
+  defaulted, deliberately: see sprint 002.
+- Block markers are matched on the `<!-- kproject:begin` **prefix**, never
+  the full line, so repos carrying a block from the retired `install.sh`
+  re-apply cleanly with no migration step.
+- The `/kproject-init` skill does not live here. `agent-skills` owns skill
+  content, kprojects owns the harness, k-homelab delivers both.
 - Keep `CLAUDE.md` and `.github/copilot-instructions.md` equivalent —
   same facts in both, outside the managed block too.
-- `just check` is the CI gate (`bash -n`, shellcheck when available).
+- `just check` is the CI gate (`ruff format --check`, `ruff check`, `ty`,
+  `pytest`).

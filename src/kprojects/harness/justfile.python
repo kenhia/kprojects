@@ -1,0 +1,15 @@
+# List available recipes
+default:
+    @just --list
+
+# Run CI gates (lint, typecheck, tests)
+check:
+    uv run ruff format --check .
+    uv run ruff check .
+    uv run ty check
+    uv run pytest
+
+# Apply formatting and safe autofixes
+fmt:
+    uv run ruff format .
+    uv run ruff check --fix .
