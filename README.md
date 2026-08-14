@@ -87,6 +87,11 @@ one marker gets the toolchain that owns its build). From a clone of this repo,
   `roadmap.md`/`justfile`, `.gitignore` entries, block injection, and warnings
   when old-harness paths (`.specify/`, `specs/`, ...) are present. It preserves
   CRLF line endings, so a Windows checkout survives re-application.
+- An existing `justfile` is never overwritten. Since the managed block tells
+  every agent that `just check` runs the gates, a repo whose gate is named
+  `gate`, `ci` or `all` instead gets a one-line `check: <gate>` alias appended
+  — so the block is true without the block's text differing between repos. If
+  no gate is recognisable, the installer says so and writes nothing.
 - `/kproject-init` is the judgment layer: run it inside a repo (or point it at
   a new one) to scaffold from scratch or survey an old harness, migrate its
   content into `sprints/`, apply the installer, and write the project-specific

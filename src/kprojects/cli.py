@@ -62,6 +62,24 @@ STACK_IGNORES = {
 
 LAYOUT_DIRS = ("sprints/planning", "sprints/review", "docs", ".scratch")
 
+# What "the recipe CI runs" is called when it is not called `check` (#1254).
+# Ordered: the first one present wins. `test` is deliberately absent — it is one
+# component of a gate, not the aggregate, so aliasing `check` to it would keep
+# the managed block's promise in the letter only.
+GATE_RECIPES = ("gate", "ci", "all")
+
+# The blank line before the doc comment is load-bearing: `just --list` shows the
+# comment line directly above a recipe, so without it the rationale's last line
+# leaks into the listing as a sentence fragment.
+CHECK_ALIAS = """\
+# Added by kproject-install: the managed block tells every agent that
+# `just check` runs the gates, so this repo needs that name. An alias rather
+# than a second recipe, so `{gate}` stays the single definition CI invokes.
+
+# Run CI gates (alias for `{gate}`)
+check: {gate}
+"""
+
 OLD_HARNESS_PATHS = (
     ".specify",
     "specs",
@@ -199,6 +217,70 @@ def _seed(path: Path, template: str, label: str) -> None:
     print(f"layout   : seeded {label}")
 
 
+def _recipe_names(text: str) -> set[str]:
+    """The names `just <name>` will accept in this justfile.
+
+    Deliberately shallow — we only need to know whether `check` is taken and
+    which known gate name is present. The two things that read as recipes if
+    you only look for a colon are assignments (`x := y`, `set shell := [...]`)
+    and indented recipe bodies, so both are excluded explicitly.
+    """
+    names: set[str] = set()
+    for line in text.split("\n"):
+        if not line[:1].strip() or line.lstrip().startswith("#"):
+            continue
+        if line.startswith("alias "):
+            # `alias check := gate` already makes `just check` work, and a
+            # recipe colliding with an alias is a hard error in just.
+            name = line[len("alias ") :].split(":=")[0].strip()
+            if name:
+                names.add(name)
+            continue
+        colon = line.find(":")
+        if colon == -1 or line[colon + 1 : colon + 2] == "=":
+            continue
+        head = line[:colon].split()
+        if head and not head[0].startswith("["):
+            names.add(head[0])
+    return names
+
+
+def ensure_check_recipe(target: Path) -> str | None:
+    """Give a pre-existing justfile a `check` recipe when it lacks one (#1254).
+
+    The managed block tells every agent that `just check` runs the gates, and
+    `_seed()` deliberately never clobbers a working justfile — so in a repo
+    whose gate is named something else the block asserted something false,
+    inside a region the repo is not allowed to hand-correct. Appending the
+    alias is what makes the block true by construction; the alternative,
+    writing the detected name into the block, was rejected because it makes the
+    block's text per-repo (korg:1255).
+
+    Returns the recipe that was aliased, or None when nothing was written.
+    """
+    path = target / "justfile"
+    if not path.exists():
+        return None
+
+    text, crlf = _read(path)
+    names = _recipe_names(text)
+    if "check" in names:
+        return None
+
+    gate = next((g for g in GATE_RECIPES if g in names), None)
+    if gate is None:
+        print(
+            "WARN     : justfile defines no `check` recipe and no recognisable gate "
+            f"({'/'.join(GATE_RECIPES)}) — the managed block's `just check` is not "
+            "true here; add a `check` recipe by hand",
+            file=sys.stderr,
+        )
+        return None
+
+    _write(path, text.rstrip("\n") + "\n\n" + CHECK_ALIAS.format(gate=gate), crlf)
+    return gate
+
+
 def warn_old_harness(target: Path) -> None:
     found = [p for p in OLD_HARNESS_PATHS if (target / p).exists()]
     for p in found:
@@ -221,6 +303,10 @@ def apply(target: Path, agent: str, stack: str) -> None:
     roadmap = target / "sprints" / "planning" / "roadmap.md"
     _seed(roadmap, "roadmap.md", "sprints/planning/roadmap.md")
     _seed(target / "justfile", f"justfile.{stack}", f"justfile ({stack})")
+    # After the seed, never before: a freshly seeded justfile already has
+    # `check`, so this only ever fires on a justfile the repo brought itself.
+    if gate := ensure_check_recipe(target):
+        print(f"justfile : added `check: {gate}` alias")
 
     for entry in ensure_gitignore(target, stack):
         print(f"gitignore: added {entry}")

@@ -68,6 +68,15 @@ kprojects is the harness itself: single-source agent conventions plus the
 - Block markers are matched on the `<!-- kproject:begin` **prefix**, never
   the full line, so repos carrying a block from the retired `install.sh`
   re-apply cleanly with no migration step.
+- An existing justfile is never overwritten, but the managed block promises
+  `just check` — so when a repo's gate goes by another name the installer
+  appends a `check: <gate>` alias, picking by `GATE_RECIPES` priority
+  (`gate`, `ci`, `all`) and warning when it recognises none. `test` is
+  excluded on purpose: it is one component of a gate, not the aggregate.
+  Sprint 004 chose this over rendering each repo's real gate name into the
+  block, so the block stays **byte-identical everywhere** (#1254). The blank
+  line above the alias's doc comment is load-bearing — `just --list` shows
+  the comment directly above a recipe.
 - The `/kproject-init` skill does not live here. `agent-skills` owns skill
   content, kprojects owns the harness, k-homelab delivers both.
 - Keep `CLAUDE.md` and `.github/copilot-instructions.md` equivalent —

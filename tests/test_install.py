@@ -275,6 +275,127 @@ def test_never_overwrites_an_existing_justfile_or_roadmap(repo: Path):
     assert (repo / "sprints" / "planning" / "roadmap.md").read_text() == "# my roadmap\n"
 
 
+# --- the `check` alias --------------------------------------------------------
+#
+# #1254: the managed block says `just check` runs the gates, but an existing
+# justfile is never overwritten — so in a repo whose gate is named something
+# else the block asserted something false, inside a region the repo is not
+# allowed to correct. klams hit this for real (sprint 044) and fixed it by hand
+# with exactly the alias these tests pin.
+
+
+def test_recipe_names_ignores_assignments_and_bodies():
+    """The two things that read as recipes if you only look for a colon."""
+    names = cli._recipe_names(
+        'gate := "not a recipe"\n'
+        'export TOKEN := "x"\n'
+        'set shell := ["bash", "-uc"]\n'
+        "# check: not a recipe either\n"
+        "default:\n"
+        "    @just --list\n"
+        "    # check: still not a recipe\n"
+        "lint: default\n"
+        "    ruff check .\n"
+    )
+    assert names == {"default", "lint"}
+
+
+def test_recipe_names_sees_parameterised_recipes_and_aliases():
+    names = cli._recipe_names('build target="dev":\n    echo {{target}}\nalias c := build\n')
+    assert names == {"build", "c"}
+
+
+def test_adds_check_alias_when_the_gate_has_another_name(repo: Path):
+    (repo / "justfile").write_text("# mine\n\ngate:\n    cargo clippy\n")
+    assert cli.ensure_check_recipe(repo) == "gate"
+    text = (repo / "justfile").read_text()
+    assert "check: gate" in text
+    assert "# mine" in text, "must extend, not replace"
+    assert "cargo clippy" in text
+
+
+def test_check_alias_lands_on_a_real_install(repo: Path):
+    """End to end: the block's promise is true in the repo it was written into."""
+    (repo / "justfile").write_text("gate:\n    cargo clippy\n")
+    (repo / "Cargo.toml").write_text("[package]\n")
+    cli.main(["--agent", "claude", str(repo)])
+    assert "`just check`" in (repo / "CLAUDE.md").read_text()
+    assert "check: gate" in (repo / "justfile").read_text()
+
+
+def test_check_alias_has_a_clean_just_list_doc_comment(repo: Path):
+    """`just --list` shows the comment line directly above a recipe. Without a
+    blank line the rationale's last line leaks in as a sentence fragment — in
+    every migrated repo's listing, which is where people look first."""
+    (repo / "justfile").write_text("gate:\n    pytest\n")
+    cli.ensure_check_recipe(repo)
+    lines = (repo / "justfile").read_text().splitlines()
+    assert lines[lines.index("check: gate") - 1] == "# Run CI gates (alias for `gate`)"
+
+
+def test_leaves_an_existing_check_recipe_alone(repo: Path):
+    body = "check:\n    pytest\ngate:\n    echo no\n"
+    (repo / "justfile").write_text(body)
+    assert cli.ensure_check_recipe(repo) is None
+    assert (repo / "justfile").read_text() == body
+
+
+def test_respects_a_check_that_is_already_an_alias(repo: Path):
+    """A recipe colliding with an alias is a hard error in just, not a duplicate."""
+    body = "gate:\n    pytest\nalias check := gate\n"
+    (repo / "justfile").write_text(body)
+    assert cli.ensure_check_recipe(repo) is None
+    assert (repo / "justfile").read_text() == body
+
+
+def test_check_alias_is_idempotent_across_reruns(repo: Path):
+    (repo / "justfile").write_text("gate:\n    pytest\n")
+    cli.ensure_check_recipe(repo)
+    once = (repo / "justfile").read_text()
+    assert cli.ensure_check_recipe(repo) is None
+    assert (repo / "justfile").read_text() == once
+
+
+def test_gate_name_priority_is_honoured(repo: Path):
+    (repo / "justfile").write_text("all:\n    x\nci:\n    y\ngate:\n    z\n")
+    assert cli.ensure_check_recipe(repo) == "gate"
+
+
+def test_test_recipe_is_not_treated_as_a_gate(repo: Path):
+    """`test` is one component of a gate, not the aggregate — aliasing to it
+    would keep the block's promise only in the letter."""
+    (repo / "justfile").write_text("test:\n    pytest\n")
+    assert cli.ensure_check_recipe(repo) is None
+    assert "check" not in (repo / "justfile").read_text()
+
+
+def test_warns_and_writes_nothing_when_no_gate_is_recognisable(repo: Path, capsys):
+    (repo / "justfile").write_text("# mine\n")
+    assert cli.ensure_check_recipe(repo) is None
+    assert (repo / "justfile").read_text() == "# mine\n"
+    assert "check" in capsys.readouterr().err
+
+
+def test_seeded_justfile_needs_no_alias(repo: Path):
+    """Every shipped template already defines `check`; none should be touched."""
+    for stack in cli.STACKS:
+        (repo / "justfile").write_text(cli._read_harness(f"justfile.{stack}"))
+        assert cli.ensure_check_recipe(repo) is None, stack
+
+
+def test_no_justfile_at_all_is_not_an_error(repo: Path):
+    assert cli.ensure_check_recipe(repo) is None
+
+
+def test_check_alias_preserves_crlf(repo: Path):
+    (repo / "justfile").write_bytes(b"gate:\r\n    pytest\r\n")
+    cli.ensure_check_recipe(repo)
+    raw = (repo / "justfile").read_bytes()
+    assert b"\r\n" in raw
+    assert b"\n" not in raw.replace(b"\r\n", b""), "must not leave mixed line endings"
+    assert "check: gate" in raw.decode()
+
+
 # --- agent targets and CLI ---------------------------------------------------
 
 
