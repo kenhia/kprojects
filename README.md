@@ -66,11 +66,11 @@ uvx --from git+https://github.com/kenhia/kprojects kproject-install ~/src/x
 ```
 
 Flags: `--agent claude|ghcp|both` (default `both`) and `--stack
-python|rust|go|other`. Leave `--stack` off and the target repo is inspected —
-`Cargo.toml` means rust, `go.mod` means go, `pyproject.toml` means python,
-anything else is other (checked in that order, so a repo carrying more than
-one marker gets the toolchain that owns its build). From a clone of this repo,
-`just apply ~/src/x` does the same.
+python|rust|go|cmake|other`. Leave `--stack` off and the target repo is
+inspected — `Cargo.toml` means rust, `go.mod` means go, `CMakeLists.txt` means
+cmake, `pyproject.toml` means python, anything else is other (checked in that
+order, so a repo carrying more than one marker gets the toolchain that owns
+its build). From a clone of this repo, `just apply ~/src/x` does the same.
 
 - `src/kprojects/harness/` — the single source for shared conventions.
   `instructions.md` is what every project gets; `tooling/<stack>.md` is the
@@ -91,7 +91,13 @@ one marker gets the toolchain that owns its build). From a clone of this repo,
   every agent that `just check` runs the gates, a repo whose gate is named
   `gate`, `ci` or `all` instead gets a one-line `check: <gate>` alias appended
   — so the block is true without the block's text differing between repos. If
-  no gate is recognisable, the installer says so and writes nothing.
+  no gate is recognisable the installer writes nothing and says why, naming
+  the consequence: the block's `just check` promise is not true in that repo
+  until someone adds one. Guessing a gate would ship one that passes by not
+  looking, which is the failure every seeded gate here is shaped to avoid —
+  `--no-tests=error` for `ctest`, capturing `gofmt -l`'s output rather than
+  its exit status, `--all-targets` for clippy, and an `other` placeholder that
+  exits 1 until it is written.
 - `/kproject-init` is the judgment layer: run it inside a repo (or point it at
   a new one) to scaffold from scratch or survey an old harness, migrate its
   content into `sprints/`, apply the installer, and write the project-specific

@@ -6,7 +6,15 @@
 default:
     @just --list
 
-# Run CI gates (lint, typecheck, tests) — wire these up for the project
+# This placeholder exits 1 deliberately. The managed block tells every agent
+# that `just check` runs the gates; a TODO that exits 0 would satisfy that
+# promise in the letter while asserting nothing — the "passes by not looking"
+# gate. Failing until it is written is the honest state. See the tooling
+# stanza in CLAUDE.md for how to decide what it should assert.
+
+# Run CI gates — TODO: write them, this repo has no stack to infer them from
 check:
-    @echo "TODO: wire project checks, e.g.:"
-    @echo "  uv run ruff check . && uv run ty check && uv run pytest"
+    @echo "No gate yet. Ask what this repo can actually get wrong, add no"
+    @echo "dependency to check it, and prove the gate fails on a planted"
+    @echo "error before trusting it. Then replace this recipe."
+    @exit 1

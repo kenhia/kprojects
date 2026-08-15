@@ -26,9 +26,14 @@
 
 ## Later / Ideas
 
-- More stacks if they earn one (node; go landed in sprint 003) — the per-stack
-  template split makes adding one cheap, so wait for a real project rather
-  than pre-building
+- More stacks if they earn one (node) — the per-stack template split makes
+  adding one cheap, so wait for a real project rather than pre-building. Go
+  landed in sprint 003, cmake in 006; both had a population of one, which is
+  the bar. Each new stack's real work is finding how its gate lies when there
+  is nothing to check
+- Re-apply to kpidash with `--stack cmake` (was migrated as `other`). Cheap
+  and optional — its hand-written gate is better than the template's and
+  should stay
 - GHCP-side equivalent of the init flow (prompt file in `.github/prompts/`?)
 - Single-source generation if CLAUDE.md / copilot-instructions.md drift
   becomes a real problem (see kagent-harness for prior art)

@@ -51,14 +51,51 @@ def test_rendered_block_carries_the_stack_specific_stanza():
     assert "cargo clippy --all-targets" in cli.render_block("rust")
     assert "gofmt" in cli.render_block("go")
     assert "ruff" not in cli.render_block("go")
+    assert "ctest" in cli.render_block("cmake")
     assert "cargo" not in cli.render_block("other")
 
 
-def test_other_stack_leaves_no_blank_bullet_hole():
-    """An empty stanza should drop its line, not leave a stray blank."""
+@pytest.mark.parametrize("stack", cli.STACKS)
+def test_no_stanza_leaves_a_blank_bullet_hole(stack: str):
+    assert "\n\n\n" not in cli.render_block(stack)
+
+
+def test_an_empty_stanza_drops_its_line(monkeypatch):
+    """No shipped stack is empty since #1258 filled `other`, but the drop is
+    still the correct response to one — a stray blank reads as a lost bullet."""
+    monkeypatch.setattr(
+        cli,
+        "_read_harness",
+        lambda *parts: (
+            "" if parts[0] == "tooling" else cli.harness_root().joinpath(*parts).read_text()
+        ),
+    )
     block = cli.render_block("other")
     assert "\n\n\n" not in block
     assert "### Tooling preferences\n\n- License" in block
+
+
+# --- `other`: guidance instead of a blank slot (#1258) ------------------------
+
+
+def test_other_stanza_carries_the_gate_reasoning():
+    """`other` means the harness cannot name the stack, so the one thing it can
+    still supply is how to decide what `just check` should assert. The four
+    points homelab-ai-plan derived unaided (PR #1) are what this pins."""
+    stanza = cli.render_block("other").lower()
+    assert "get wrong" in stanza, "ask what the repo can actually get wrong"
+    assert "no dependency" in stanza or "dependency" in stanza
+    assert "negative-test" in stanza, "a gate never seen to fail is not a gate"
+
+
+def test_other_justfile_placeholder_gate_fails():
+    """The seeded `other` gate is a TODO. Exiting 0 would make it the exact
+    'passes by not looking' gate this project keeps refusing to ship — and the
+    managed block would then promise a `just check` that succeeds while
+    asserting nothing. An unwritten gate must not report success."""
+    body = cli._read_harness("justfile.other")
+    check = body.split("check:")[1]
+    assert "exit 1" in check
 
 
 # --- block injection ---------------------------------------------------------
@@ -181,6 +218,32 @@ def test_cargo_wins_over_go_mod(repo: Path):
     assert cli.detect_stack(repo) == "rust"
 
 
+def test_detects_cmake_from_cmakelists(repo: Path):
+    (repo / "CMakeLists.txt").write_text("project(x C)\n")
+    assert cli.detect_stack(repo) == "cmake"
+
+
+def test_cmake_wins_over_pyproject(repo: Path):
+    """The kpidash shape: a C build at the root, Python only in a client package.
+
+    `CMakeLists.txt` defines a build the way `Cargo.toml` and `go.mod` do, so it
+    ranks above the marker that doubles as tool config.
+    """
+    (repo / "CMakeLists.txt").write_text("project(x C)\n")
+    (repo / "pyproject.toml").write_text("[project]\n")
+    assert cli.detect_stack(repo) == "cmake"
+
+
+def test_cargo_and_go_win_over_cmakelists(repo: Path):
+    """CMake commonly appears as a *dependency's* build system inside a Rust or
+    Go repo (`cc`/`cgo` vendoring), so it must not outrank either."""
+    (repo / "CMakeLists.txt").write_text("project(x C)\n")
+    (repo / "go.mod").write_text("module example.com/x\n")
+    assert cli.detect_stack(repo) == "go"
+    (repo / "Cargo.toml").write_text("[package]\n")
+    assert cli.detect_stack(repo) == "rust"
+
+
 def test_explicit_stack_overrides_detection(repo: Path):
     (repo / "Cargo.toml").write_text("[package]\n")
     cli.main(["--stack", "other", "--agent", "claude", str(repo)])
@@ -214,6 +277,11 @@ def test_gitignore_gets_stack_entries(repo: Path):
     lines = (repo / ".gitignore").read_text().splitlines()
     assert "*.test" in lines
     assert "go.work" in lines
+    cli.ensure_gitignore(repo, "cmake")
+    lines = (repo / ".gitignore").read_text().splitlines()
+    assert "build/" in lines
+    assert "build-*/" in lines, "kpidash carries build-native/ and build-pi5/"
+    assert "CMakeCache.txt" in lines
 
 
 def test_gitignore_does_not_duplicate_on_rerun(repo: Path):
@@ -264,6 +332,32 @@ def test_go_gate_does_not_trust_gofmt_exit_status():
     check = cli._read_harness("justfile.go").split("check:")[1].split("\n\n")[0]
     assert "gofmt -l" in check
     assert "$(gofmt -l" in check, "gate must capture gofmt output, not just run it"
+
+
+def test_seeds_the_cmake_justfile_when_cmakelists_is_present(repo: Path):
+    (repo / "CMakeLists.txt").write_text("project(x C)\n")
+    cli.main(["--agent", "claude", str(repo)])
+    text = (repo / "justfile").read_text()
+    assert "cmake --build" in text
+    assert "ctest" in text
+
+
+def test_cmake_gate_treats_an_empty_test_suite_as_failure():
+    """`ctest` prints "No tests were found!!!" and exits 0 when nothing is
+    registered — so a bare call is a gate that passes loudest when there is
+    least to check. Same class of trap as `gofmt -l` (003) and `clippy` without
+    `--all-targets`: the gate must opt into the strict behaviour explicitly.
+    """
+    check = cli._read_harness("justfile.cmake").split("check:")[1]
+    assert "ctest" in check
+    assert "--no-tests=error" in check, "bare ctest exits 0 with no tests registered"
+
+
+def test_cmake_gate_builds_out_of_source_in_its_own_tree():
+    """A cross-compiled repo already has a build tree per target; the gate must
+    not fight one of them for CMakeCache.txt."""
+    body = cli._read_harness("justfile.cmake")
+    assert "build-check" in body
 
 
 def test_never_overwrites_an_existing_justfile_or_roadmap(repo: Path):
@@ -376,6 +470,21 @@ def test_warns_and_writes_nothing_when_no_gate_is_recognisable(repo: Path, capsy
     assert "check" in capsys.readouterr().err
 
 
+def test_the_no_gate_warning_names_the_consequence(repo: Path, capsys):
+    """#1259. Writing nothing stays right — a guessed gate passes by not looking
+    — but the block's `just check` promise is unconditional, so the warning has
+    to state that the promise is false here, not merely that a recipe is absent.
+    kpidash (sprint 014) is the evidence this lever works: the warning was
+    noticed and the gap closed in the same sitting.
+    """
+    (repo / "justfile").write_text("_default:\n    @just --list\npublish:\n    kpkg add\n")
+    assert cli.ensure_check_recipe(repo) is None
+    err = capsys.readouterr().err.lower()
+    assert "managed block" in err, "must name what is now false, not just what is missing"
+    assert "not true" in err or "false" in err
+    assert "nothing was written" in err, "say the installer declined, so it reads as a choice"
+
+
 def test_seeded_justfile_needs_no_alias(repo: Path):
     """Every shipped template already defines `check`; none should be touched."""
     for stack in cli.STACKS:
@@ -424,6 +533,17 @@ def test_missing_target_is_an_error(tmp_path: Path):
 def test_invalid_stack_is_rejected(repo: Path):
     with pytest.raises(SystemExit):
         cli.main(["--stack", "haskell", str(repo)])
+
+
+def test_instructions_ask_for_work_items_to_be_resolved_as_they_complete():
+    """#1166. Agents batch every resolution into sprint-ship, so kfdc's Fire
+    Missions card read 1/10 for the whole life of a sprint that was nearly done
+    — a progress bar that says nothing while it would be useful, then jumps to
+    10/10. The instruction belongs in the block every agent already reads.
+    """
+    block = cli.render_block("python").lower()
+    assert "resolved" in block
+    assert "sprint-ship" in block
 
 
 def test_warns_about_old_harness_remnants(repo: Path, capsys):

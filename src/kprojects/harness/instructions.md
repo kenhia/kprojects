@@ -25,6 +25,9 @@ over ceremony.
 
 - One sprint ≈ one PR. Sprint proposals and work items are managed in
   `korg`; durable cross-project knowledge goes in `klams`.
+- Mark each work item resolved as its work completes — don't batch the
+  resolutions into sprint-ship. A proposal's progress should be readable
+  while the sprint is running, which is the only time it is useful.
 - If the korg or klams MCP tools are unavailable in your session, say so
   up front — don't silently work around missing infrastructure.
 - TDD preferred: write the failing test first when practical.

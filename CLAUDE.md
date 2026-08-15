@@ -26,6 +26,9 @@ over ceremony.
 
 - One sprint ≈ one PR. Sprint proposals and work items are managed in
   `korg`; durable cross-project knowledge goes in `klams`.
+- Mark each work item resolved as its work completes — don't batch the
+  resolutions into sprint-ship. A proposal's progress should be readable
+  while the sprint is running, which is the only time it is useful.
 - If the korg or klams MCP tools are unavailable in your session, say so
   up front — don't silently work around missing infrastructure.
 - TDD preferred: write the failing test first when practical.
@@ -56,10 +59,18 @@ kprojects is the harness itself: single-source agent conventions plus the
   Never resolve templates relative to `__file__` — that adjacency assumption
   was the bug (#699) that made the old bash installer non-portable.
 - Stack is **detected** from the target repo (`Cargo.toml` → rust, `go.mod` →
-  go, `pyproject.toml` → python, else other); `--stack` overrides. It is not
-  defaulted, deliberately: see sprint 002. `STACK_MARKERS` order decides a
-  polyglot repo — `pyproject.toml` is deliberately last, since it also appears
-  carrying nothing but ruff config.
+  go, `CMakeLists.txt` → cmake, `pyproject.toml` → python, else other);
+  `--stack` overrides. It is not defaulted, deliberately: see sprint 002.
+  `STACK_MARKERS` order decides a polyglot repo — `pyproject.toml` is
+  deliberately last, since it also appears carrying nothing but ruff config,
+  and `CMakeLists.txt` sits below cargo/go because CMake is often a vendored
+  dependency's build system inside those.
+- Every seeded gate must fail when it has nothing to assert. Each stack has
+  its own way of not doing that: `gofmt -l` exits 0 and prints (003), `clippy`
+  skips test targets without `--all-targets`, and `ctest` exits 0 on "No tests
+  were found!!!" unless given `--no-tests=error` (006). The `other`
+  placeholder exits 1 for the same reason — a TODO gate that succeeds makes
+  the block's `just check` promise true in the letter and false in substance.
 - Adding a stack is one `STACKS` value, one `STACK_MARKERS` entry, one
   `STACK_IGNORES` entry (`()` is valid) and two files —
   `harness/tooling/<stack>.md` + `harness/justfile.<stack>`. The
@@ -77,6 +88,12 @@ kprojects is the harness itself: single-source agent conventions plus the
   block, so the block stays **byte-identical everywhere** (#1254). The blank
   line above the alias's doc comment is load-bearing — `just --list` shows
   the comment directly above a recipe.
+- When no gate exists under any name there is nothing to alias, so the
+  installer still writes nothing and `NO_GATE_WARNING` carries the
+  consequence instead — that the block's promise is now false here (#1259).
+  Seeding a TODO `check` into someone's justfile was declined in sprint 006:
+  kpidash showed a seeded guess configures the wrong thing, since its real
+  gate was readable only from its own `CMakeLists.txt`.
 - The `/kproject-init` skill does not live here. `agent-skills` owns skill
   content, kprojects owns the harness, k-homelab delivers both.
 - Keep `CLAUDE.md` and `.github/copilot-instructions.md` equivalent —
