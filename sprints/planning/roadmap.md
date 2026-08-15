@@ -28,12 +28,14 @@
 
 - More stacks if they earn one (node) — the per-stack template split makes
   adding one cheap, so wait for a real project rather than pre-building. Go
-  landed in sprint 003, cmake in 006; both had a population of one, which is
-  the bar. Each new stack's real work is finding how its gate lies when there
-  is nothing to check
-- Re-apply to kpidash with `--stack cmake` (was migrated as `other`). Cheap
-  and optional — its hand-written gate is better than the template's and
-  should stay
+  landed in sprint 003 with a population of one; cmake in 006, believed to be
+  one and actually two. Each new stack's real work is finding how its gate lies
+  when there is nothing to check
+- Re-apply the two C repos with `--stack cmake`: **kdeskdash (#1280) first** —
+  its block is a pre-detection `install.sh` one still carrying the *python*
+  stanza, so it is wrong now — then kpidash (#1279), which is merely less
+  specific. Both keep their hand-written gates; those are better than the
+  template's
 - GHCP-side equivalent of the init flow (prompt file in `.github/prompts/`?)
 - Single-source generation if CLAUDE.md / copilot-instructions.md drift
   becomes a real problem (see kagent-harness for prior art)

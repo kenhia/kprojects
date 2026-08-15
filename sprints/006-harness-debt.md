@@ -126,10 +126,20 @@ message, as intended.
   hand-written gate is better than the template's and should stay. Its
   `build-native/`/`build-pi5/` trees are what `build-*/` in `STACK_IGNORES` was
   written for.
-- **The cmake stanza's advice is untested against a second C repo**, because
-  there isn't one. If one arrives and the generic configure/build/ctest gate
-  turns out not to fit, that is the signal that #1260's research comment was
-  right and the stack should collapse back into `other`.
+- **Correction, same day — the population was never one.** This sprint decided
+  the fifth stack believing kpidash was the only C repo in the fleet, and
+  recorded a follow-up saying the stanza was "untested against a second C repo,
+  because there isn't one". **`kdeskdash` is a second one** (Ken flagged it);
+  korg #737's survey missed it. It corroborates the template rather than
+  testing it — its hand-written gate is `cmake -B build` / `cmake --build` /
+  `ctest --test-dir build`, the same triple shipped here, arrived at
+  independently. So the evidence #1260's research comment said did not exist
+  ("no CI to mirror, no existing source of truth to copy") was in the next repo
+  over, and its `build/` + `build-pi/` split is exactly the two-tree case
+  `build-check/` and the `build-*/` ignore were written for. Detail on #1260.
+- **Both C repos' gates omit `--no-tests=error`** and would pass silently if
+  their tests ever stopped registering — kpidash (#1279) and kdeskdash (#1280).
+  Neither is biting today (7 and 18 tests registered).
 - **`STACK_MARKERS` now has a real precedence question in it.** A repo with
   `CMakeLists.txt` and `pyproject.toml` at the root gets cmake; that is pinned
   by test and is right for kpidash, but it is the first ordering call made
