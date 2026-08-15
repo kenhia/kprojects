@@ -34,7 +34,7 @@ END_PREFIX = "<!-- kproject:end"
 
 TOOLING_PLACEHOLDER = "{{TOOLING}}"
 
-STACKS = ("python", "rust", "go", "other")
+STACKS = ("python", "rust", "go", "cmake", "other")
 AGENTS = ("claude", "ghcp", "both")
 
 AGENT_FILES = {
@@ -45,10 +45,17 @@ AGENT_FILES = {
 
 # Ordered: a repo carrying more than one is treated as the one whose toolchain
 # owns the build. Cargo stays first — it is the stricter gate. `pyproject.toml`
-# is last because it is the weakest signal of the three: `Cargo.toml` and
-# `go.mod` define a build, `pyproject.toml` also shows up carrying nothing but
-# ruff settings in repos that are not Python projects at all.
-STACK_MARKERS = (("rust", "Cargo.toml"), ("go", "go.mod"), ("python", "pyproject.toml"))
+# is last because it is the weakest signal: `Cargo.toml`, `go.mod` and
+# `CMakeLists.txt` define a build, `pyproject.toml` also shows up carrying
+# nothing but ruff settings in repos that are not Python projects at all.
+# `CMakeLists.txt` sits above it for that reason and below cargo/go because
+# CMake is commonly a *vendored dependency's* build system inside those.
+STACK_MARKERS = (
+    ("rust", "Cargo.toml"),
+    ("go", "go.mod"),
+    ("cmake", "CMakeLists.txt"),
+    ("python", "pyproject.toml"),
+)
 
 BASE_IGNORES = (".scratch/", ".env")
 STACK_IGNORES = {
@@ -57,6 +64,10 @@ STACK_IGNORES = {
     # `go.work` is per-machine by design (upstream guidance is not to commit it);
     # `*.test` and `*.out` are `go test -c` binaries and profile output.
     "go": ("*.exe", "*.test", "*.out", "go.work", "go.work.sum"),
+    # `build-*/` covers the per-target trees a cross-compiled repo keeps
+    # (kpidash has build-native/ and build-pi5/) and the gate's own build-check/.
+    # `compile_commands.json` is generated for clangd and is machine-specific.
+    "cmake": ("build/", "build-*/", "CMakeFiles/", "CMakeCache.txt", "compile_commands.json"),
     "other": (),
 }
 
@@ -79,6 +90,31 @@ CHECK_ALIAS = """\
 # Run CI gates (alias for `{gate}`)
 check: {gate}
 """
+
+# #1259 — the hole #1254 left open. When a justfile defines no gate under any
+# name there is nothing to alias, and writing a guessed one would ship the
+# "passes by not looking" gate this project keeps refusing. So we still write
+# nothing; what changes is that the warning names the *consequence* — the block
+# now asserts something false — rather than only the missing recipe.
+#
+# Seeding a TODO `check` was the considered alternative and Ken declined it
+# (sprint 006). kpidash is why: a seeded TODO would have been one more thing to
+# delete, and a seeded guess (`cmake -B build && ctest`) would have configured
+# the wrong thing entirely — its real gate needed `-DTESTS_ONLY=ON`, readable
+# only from its own CMakeLists.txt. The warning is the better lever, and it is
+# already evidenced to work: kpidash's gap was noticed and closed in one sitting.
+NO_GATE_WARNING = (
+    "justfile defines no `check` recipe and no recognisable gate ({gates}).",
+    (
+        "the managed block promises every agent that `just check` runs the gates,"
+        " so that promise is NOT TRUE in this repo until you add one."
+    ),
+    (
+        "nothing was written — a guessed gate passes by not looking. Write a"
+        " `check` that asserts what this repo can actually get wrong, and watch it"
+        " fail on a planted error before trusting it."
+    ),
+)
 
 OLD_HARNESS_PATHS = (
     ".specify",
@@ -256,6 +292,9 @@ def ensure_check_recipe(target: Path) -> str | None:
     writing the detected name into the block, was rejected because it makes the
     block's text per-repo (korg:1255).
 
+    When there is no gate under any name there is nothing to alias, so nothing
+    is written and NO_GATE_WARNING carries the consequence instead (#1259).
+
     Returns the recipe that was aliased, or None when nothing was written.
     """
     path = target / "justfile"
@@ -269,12 +308,8 @@ def ensure_check_recipe(target: Path) -> str | None:
 
     gate = next((g for g in GATE_RECIPES if g in names), None)
     if gate is None:
-        print(
-            "WARN     : justfile defines no `check` recipe and no recognisable gate "
-            f"({'/'.join(GATE_RECIPES)}) — the managed block's `just check` is not "
-            "true here; add a `check` recipe by hand",
-            file=sys.stderr,
-        )
+        for line in NO_GATE_WARNING:
+            print(f"WARN     : {line.format(gates='/'.join(GATE_RECIPES))}", file=sys.stderr)
         return None
 
     _write(path, text.rstrip("\n") + "\n\n" + CHECK_ALIAS.format(gate=gate), crlf)
