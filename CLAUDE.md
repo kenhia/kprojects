@@ -15,6 +15,9 @@ over ceremony.
     `###-<short-name>/` directory of files for larger/more formal ones
   - a sprint record is one informal narrative: goal, decisions, what
     shipped, follow-ups — written during the sprint, not after
+  - projects that deploy end the record with a `## Deployed` section:
+    what shipped, where, when, and what was verified live — appended
+    after the deploy, not predicted before it
 - `docs/` — project documentation, architecture, usage
 - `.scratch/` — git-ignored scratch space for user or agent ephemera;
   use it instead of /tmp
