@@ -68,10 +68,123 @@ lines, the same three in each agent file.
 
 ## The re-apply pass
 
-*Filled in as the pass runs — see handoff korg:1282 for the plan, the traps and
-the audit script.*
+All 14 repos, one branch and one squash-merged PR each, `chore/kproject-reapply`
+throughout. Run from cleo, driving kai and kubs0 over ssh, per the handoff.
+
+**No per-repo sprint record.** A re-apply is a block refresh, not a sprint —
+fourteen near-identical records would be exactly the ceremony the harness's own
+first paragraph argues against. The record is here, where the work was tracked.
+
+### Tier 1 — five Rust repos told to use `uv`, `ruff` and `ty`
+
+| Repo | Host | PR | Gate |
+|---|---|---|---|
+| kaed | kai | [#20](https://github.com/kenhia/kaed/pull/20) | green |
+| korg | kai | [#62](https://github.com/kenhia/korg/pull/62) | green |
+| khound | kubs0 | [#3](https://github.com/kenhia/khound/pull/3) | green |
+| klams-view | kubs0 | [#2](https://github.com/kenhia/klams-view/pull/2) | green |
+| krot | cleo | [#1](https://github.com/kenhia/krot/pull/1) | green |
+
+Full `just check` on all five, per the verification decision. **Every gate
+passed first time**, including repos this rollout had never run one in.
+
+### Tier 2 — nine `other`-stack repos wearing a Python stanza
+
+| Repo | Host | PR |
+|---|---|---|
+| harness-eval | kai | [#3](https://github.com/kenhia/harness-eval/pull/3) |
+| mortars | kai | [#3](https://github.com/kenhia/mortars/pull/3) |
+| kfdc | kai | [#11](https://github.com/kenhia/kfdc/pull/11) |
+| kfo | kai | [#1](https://github.com/kenhia/kfo/pull/1) |
+| korg-dash | kai | [#1](https://github.com/kenhia/korg-dash/pull/1) |
+| kwebi | kai | [#3](https://github.com/kenhia/kwebi/pull/3) |
+| k-homelab | kubs0 | [#40](https://github.com/kenhia/k-homelab/pull/40) |
+| agent-skills | kubs0 | [#18](https://github.com/kenhia/agent-skills/pull/18) |
+| korg-vs | cleo | [#1](https://github.com/kenhia/korg-vs/pull/1) |
+
+Light proof: diff is block-only, and re-running the installer leaves it
+unchanged. No `.gitignore` changed in tier 2, so no full gates were owed.
+
+### The four traps
+
+1. **`agent-skills`' two clones** — fixed on kubs0, pushed, then `git pull` on
+   cleo's `D:\src\agent-skills`. Clean fast-forward, no conflict; one commit
+   served both. The trap was real and the prescribed order avoided it.
+2. **kubs0's `kprojects` duplicate** — left alone, as instructed. It still
+   audits `OLD-INSTALLER`, which is the correct outcome: it is a clone that
+   should be dropped, and fixing it would entrench it.
+3. **`harness-eval-runs/*` fixtures** — untouched; the audit script excludes
+   them by path.
+4. **korg fixing itself** — harmless, as predicted. Block-only, no deploy.
+
+### What the pass found
+
+- **The installer adds `target/` to Rust repos that already ignore `/target`.**
+  It checks for its own exact string, so cargo's `/target` does not satisfy it
+  and both lines end up present. Seen in all five tier-1 repos. Not harmful —
+  the patterns differ in scope, and `target/` is arguably the better one for a
+  workspace — but it is noise the installer creates on every Rust re-apply.
+  Filed separately.
+- **`--agent both` created a GHCP file in four repos that had only the Claude
+  one** (khound, krot, korg-vs, agent-skills). Intended by the command the
+  handoff specifies, but it is a new file rather than a block refresh, so it is
+  worth having said out loud.
+- **Nothing changed beyond the block, `.gitignore` and that new agent file.**
+  The analysis predicted no surprises here and there were none.
+- **No repo lost its gate.** `_seed()`'s early return held everywhere; no
+  justfile was touched, and no `NO_GATE_WARNING` fired.
+- **kaed had three untracked paths** (`.claude/skills/triage-feedback/`,
+  `docs/feedback-triage.md`, `scripts/feedback-dump.py`) unrelated to this
+  work. Staged selectively rather than `git add -A`, so they were never swept
+  into a commit; they are still untracked. Selective staging is the right
+  default for a mechanical pass anyway — it makes "the diff is block-only" a
+  property of the commit rather than a claim about it.
+- **k-homelab was mid-sprint** on `chore/kfdc-serve-to-kubsdb` (kfdc #1188,
+  pushed to origin). The re-apply branched from `main`, merged there, and the
+  checkout was restored to that branch afterwards. See the audit note below.
+
+### Closing audit
+
+Re-ran the handoff's script on all three hosts.
+
+| Host | Blocks found | `OLD-INSTALLER` |
+|---|---|---|
+| kai | 19 | **0** |
+| kubs0 | 8 | 2 — both explained |
+| cleo | 6 | **0** |
+
+The two kubs0 rows:
+
+- `src/ai-agents/kprojects` — **trap 2**, the stale duplicate clone. Deliberately
+  not fixed.
+- `k-homelab` — an **artifact of the restored checkout**, not a miss. `main`
+  carries the current block (`bc39dee`, verified by reading
+  `git show main:CLAUDE.md`); the working tree sits on the kfdc branch, which
+  forked before the merge and will pick the block up when it lands.
+
+Marker/stanza agreement: every row matches its detected stack, with three
+known, non-defects:
+
+- `kprojects` itself audits `block:cmake` — the documented false positive; its
+  block *discusses* the stack. The handoff said not to chase it.
+- `kpidash` audits `block:none` against `CMakeLists.txt` — korg #1279, out of
+  scope for this pass by design.
+- `hv-simulator` audits `block:python` with no root markers — a deliberate
+  `--stack python` override, and correct: it has five `pyproject.toml` files,
+  all in subdirectories (`engine/`, `tools/*`), so detection alone would call
+  it `other` and be wrong. A fair argument that detection should look one level
+  down, but not this sprint's business.
+
+`kp-example` was already gone from all three hosts — Ken deleted it as planned.
 
 ## Follow-ups
 
 - **sprint-ship Step 7.3 can shrink** now that the convention carries the
-  shape. Filed against `agent-skills`.
+  shape. Filed against `agent-skills` (korg #1287).
+- **The `target/` gitignore duplicate** — the installer should recognise an
+  existing ignore of the same directory under a different pattern before adding
+  its own. Filed against kprojects.
+- **Detection ignores subdirectory stack markers.** `hv-simulator` needs
+  `--stack python` by hand because its `pyproject.toml` files are one level
+  down. Worth a look alongside #1258/#1260, though "look at the root only" is a
+  defensible rule and the override exists.

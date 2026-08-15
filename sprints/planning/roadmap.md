@@ -11,15 +11,19 @@
 - Point `/kproject-init` at the new invocation and add the greenfield stack
   question (agent-skills #1184; program 1103 slice 2) — until that lands,
   nothing passes `--stack`, so stack-awareness is only reachable by hand
+- **Re-apply pass done (sprint 007).** All 14 repos still on the retired bash
+  installer's block were re-applied — five of them Rust repos that had been
+  instructing agents to use `uv`, `ruff` and `ty`. Closing audit: zero
+  `OLD-INSTALLER` rows on kai and cleo; the two on kubs0 are the duplicate
+  clone that should be dropped and a checkout sitting on a pre-merge branch.
+  What is left is the two batch-5 slices (kdeskdash #1280, kpidash #1279) and
+  the installer warts the pass surfaced — the duplicate `target/` gitignore
+  line, and detection not seeing subdirectory stack markers.
 
 ## Next
 
 - Harness survey and rollout across cleo/kai/kubs0 (proposal 749): route every
   Ken-owned repo to kprojects, working-skill-repo, or deliberately bare
-- Re-apply to the repos already on the harness so they pick up the repo-URL
-  fix, the new marker text, and the `check:` alias (sprint 004) — the alias
-  matters most for the batch 3-6 repos that already have a justfile with a
-  differently-named gate
 - Sharpen old-harness detection in the skill (exact ATV-Starter Kit and
   Phoenix footprints, learned from real migrations)
 - Try `/kproject-init` on 1–2 real projects; fix what chafes
