@@ -20,6 +20,13 @@
   the installer warts the pass surfaced — the duplicate `target/` gitignore
   line, and detection not seeing subdirectory stack markers.
 
+- **Cross-project-plan pointer in the block (sprint 008).** Nine conditional
+  lines: grep `cross-project-planning/index.md` for your project, and only
+  then read its plan folder. The fourth surface of program 1405's rollout,
+  after the skill trio. Left to do: re-apply to korg, kfdc and kfo — which
+  runs from **main**, so it follows the merge, and slice 3 (proposal 1404)
+  verifies it landed.
+
 ## Next
 
 - Harness survey and rollout across cleo/kai/kubs0 (proposal 749): route every

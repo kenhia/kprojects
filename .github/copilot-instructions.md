@@ -34,6 +34,15 @@ over ceremony.
   while the sprint is running, which is the only time it is useful.
 - If the korg or klams MCP tools are unavailable in your session, say so
   up front — don't silently work around missing infrastructure.
+- A few projects share contract surfaces with siblings and have a
+  **guiding plan** constraining how those change; most have none, and one
+  grep is the whole cost of finding out. Grep the `index.md` routing
+  table in `kai:~/src/tools/cross-project-planning` — a local path on
+  kai, read through kaed from any other host (`root: "kai:src"`, path
+  `tools/cross-project-planning/…`); don't clone a second copy. Not
+  listed → nothing applies. Listed → read the mapped plan folder before
+  planning sessions and before changing a contract surface it names, and
+  amend the plan in the same ship when what you build diverges from it.
 - TDD preferred: write the failing test first when practical.
 
 ### Tooling preferences
@@ -97,6 +106,14 @@ kprojects is the harness itself: single-source agent conventions plus the
   Seeding a TODO `check` into someone's justfile was declined in sprint 006:
   kpidash showed a seeded guess configures the wrong thing, since its real
   gate was readable only from its own `CMakeLists.txt`.
+- The block's cross-project-plan pointer names a repo on another host, so it
+  carries a **location** and never a procedure. The routing table
+  (`kai:~/src/tools/cross-project-planning/index.md`) and the amend rules live
+  there; the same location is also spelled out in `start-sprint`,
+  `sprint-ship` and `refill-queue` over in `agent-skills`, so a move touches
+  four places. Restating the plan repo's own rules here would make it five
+  copies of a procedure instead — which is what
+  `test_the_plan_pointer_does_not_restate_the_plan_repos_own_rules` forbids.
 - The `/kproject-init` skill does not live here. `agent-skills` owns skill
   content, kprojects owns the harness, k-homelab delivers both.
 - Keep `CLAUDE.md` and `.github/copilot-instructions.md` equivalent —

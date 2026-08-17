@@ -546,6 +546,32 @@ def test_instructions_ask_for_work_items_to_be_resolved_as_they_complete():
     assert "sprint-ship" in block
 
 
+@pytest.mark.parametrize("stack", cli.STACKS)
+def test_instructions_carry_the_cross_project_plan_pointer(stack: str):
+    """#1406. A plan nobody reads is a document, not a constraint — but a vague
+    "consider the plan" gets token-taxed in every repo and acted on in none. So
+    the pointer states the applicability test first (one grep of `index.md`),
+    then the location, and nothing else: the amend procedure and the
+    supersede-don't-delete rule stay in the plan repo's own README, exactly as
+    the skill trio's blocks do. Every stack carries it — mapping is a property
+    of the project, not of its toolchain.
+    """
+    block = cli.render_block(stack)
+    assert "cross-project-planning" in block, "the repo the routing table lives in"
+    assert "index.md" in block, "the applicability test is a grep, and it must be named"
+    assert 'root: "kai:src"' in block, "three of the mapped repos are read from other hosts"
+    assert "clone a second copy" in block, "the drift this pointer exists to avoid"
+
+
+def test_the_plan_pointer_does_not_restate_the_plan_repos_own_rules():
+    """The location is duplicated in four places (three skills + this block) and
+    that is affordable; the *procedure* is not. Copies of a rule drift.
+    """
+    block = cli.render_block("other")
+    assert "supersede" not in block.lower()
+    assert "GP-" not in block
+
+
 def test_warns_about_old_harness_remnants(repo: Path, capsys):
     (repo / "specs").mkdir()
     cli.main(["--agent", "claude", str(repo)])
