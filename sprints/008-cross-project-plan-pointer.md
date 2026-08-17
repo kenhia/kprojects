@@ -112,10 +112,60 @@ installer built from this branch:
   measurable: a false reconcile item in #1406 and the proposal split that came
   with it. korg #737 territory; sprint 007 left it deliberately, and this is
   the evidence for revisiting that.
+- **Fleet re-apply pass** (korg #1409) — see the closing audit below.
 - Program 1405's slice 3 (proposal 1404) verifies the block landed in all three
   repos — this sprint's re-apply pass is what it checks.
 
 ## The re-apply pass
 
-_Runs after this PR merges; recorded here in a follow-up commit to main, as
-sprint 007 did._
+Ran after the merge, from `main`, via
+`uvx --from git+https://github.com/kenhia/kprojects kproject-install <repo>` —
+which resolved to `d41ea07`, this sprint's own squash commit, so the ordering
+decision above is not just asserted but visible in the build line.
+
+One branch and one squash-merged PR each, `chore/kproject-reapply` throughout.
+**No per-repo sprint record** — a re-apply is a block refresh, not a sprint;
+the record is here, following sprint 007.
+
+| Repo | Stack | PR | Merge | Gate |
+|---|---|---|---|---|
+| korg | rust | [#66](https://github.com/kenhia/korg/pull/66) | `4962c51` | CI green — rust 6m47s, web 23s |
+| kfdc | other | [#13](https://github.com/kenhia/kfdc/pull/13) | `3c966db` | no CI; light proof |
+| kfo | other | [#2](https://github.com/kenhia/kfo/pull/2) | `9a27c5c` | no CI; light proof |
+
+The light proof is sprint 007's, and it is what was owed here: neither of its
+two triggers for a full local gate fired — no `.gitignore` changed, and no repo
+was carrying actively wrong guidance (that was 007's tier 1, the Rust repos
+being told to reach for `uv`). korg's CI ran anyway because it has one.
+
+What the pass found: **nothing.** Every prediction from the pre-verification
+held exactly — +9 lines in `CLAUDE.md` and +9 in
+`.github/copilot-instructions.md` in all three, no other file touched, second
+run a no-op, detection unchanged. That is the pre-verification earning its
+keep rather than a dull result: staging copies and running the installer
+against them turned the pass into a confirmation instead of a discovery.
+
+### Closing audit — and the property this sprint broke
+
+40 agent files on kai carry a kproject block. **8 now have the pointer** —
+kprojects, korg, kfdc, kfo, two files each. The other 32, across 16 repos, are
+pre-008:
+
+`harness-eval`, `homelab-ai-plan`, `kaed`, `kmon`, `kvllm`, `kyac`,
+`hv-simulator`, `mortars`, `apt-temps`, `kdeskdash`, `khlenv`, `kmuster`,
+`knarr`, `korg-dash`, `kpidash`, `kwebi` — plus whatever kubs0 and cleo hold,
+not audited here.
+
+This is worth naming rather than filing quietly, because it is **#1254's
+"byte-identical everywhere" property, temporarily false**. Sprint 004 rejected
+rendering each repo's real gate name into the block specifically to keep the
+text the same in every repo; a partial re-apply pass is the other way to lose
+that, and this sprint chose it knowingly. #1406 scoped the re-apply to the
+three repos in `index.md` — the ones where the pointer actually fires — which
+is right for *this* sprint, since the alternative was a 16-repo, three-host
+pass riding on a proposal about wiring one pointer.
+
+But the pointer is deliberately cheap for unmapped repos (one grep, then
+stop), so there is no reason for them to stay behind, and "the block differs by
+repo" is precisely the state that makes the next drift finding hard to trust —
+as item 1 of this very sprint demonstrated. Filed as korg #1409.
