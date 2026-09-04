@@ -106,6 +106,16 @@ kprojects is the harness itself: single-source agent conventions plus the
   Seeding a TODO `check` into someone's justfile was declined in sprint 006:
   kpidash showed a seeded guess configures the wrong thing, since its real
   gate was readable only from its own `CMakeLists.txt`.
+- `.sprint-defaults` is gitignored everywhere but seeded only under
+  `--greenfield` (#1855). The same sprint-006 reasoning splits those two: the
+  ignore line is always right, while the contents are one line that becomes
+  sprint-ship's whole `$ARGUMENTS`, so seeding `PR, merge, local clean` into a
+  repo that already ships differently would configure its ship from a guess.
+  An existing file is never overwritten — it is per-person, per-machine — and
+  `SPRINT_DEFAULTS` is one constant so the seed and the report line echoing it
+  cannot drift. `.sprint-deploy` is deliberately not seeded at all: whether a
+  repo deploys is a property of the repo. The flag has no caller yet —
+  kproject-init's greenfield path must pass it (agent-skills, korg:1855).
 - The block's cross-project-plan pointer names a repo on another host, so it
   carries a **location** and never a procedure. The routing table
   (`kai:~/src/tools/cross-project-planning/index.md`) and the amend rules live

@@ -369,6 +369,64 @@ def test_never_overwrites_an_existing_justfile_or_roadmap(repo: Path):
     assert (repo / "sprints" / "planning" / "roadmap.md").read_text() == "# my roadmap\n"
 
 
+# --- `.sprint-defaults` (#1855) ----------------------------------------------
+
+
+def test_gitignore_gets_sprint_defaults(repo: Path):
+    cli.ensure_gitignore(repo, "other")
+    assert ".sprint-defaults" in (repo / ".gitignore").read_text().splitlines()
+
+
+def test_greenfield_seeds_the_defaults_file(repo: Path):
+    cli.main(["--greenfield", "--agent", "claude", str(repo)])
+    assert (repo / ".sprint-defaults").read_text() == cli.SPRINT_DEFAULTS + "\n"
+
+
+def test_a_migration_target_gets_the_gitignore_line_but_no_seed(repo: Path):
+    """An existing repo may already ship differently — seeding would configure it."""
+    cli.main(["--agent", "claude", str(repo)])
+    assert not (repo / ".sprint-defaults").exists()
+    assert ".sprint-defaults" in (repo / ".gitignore").read_text().splitlines()
+
+
+def test_never_overwrites_an_existing_defaults_file(repo: Path):
+    """It is per-person, per-machine by sprint-ship's own rule."""
+    (repo / ".sprint-defaults").write_text("PR, no merge\n")
+    cli.main(["--greenfield", "--agent", "claude", str(repo)])
+    assert (repo / ".sprint-defaults").read_text() == "PR, no merge\n"
+
+
+def test_seeding_is_idempotent_across_reruns(repo: Path):
+    cli.main(["--greenfield", "--agent", "claude", str(repo)])
+    (repo / ".sprint-defaults").write_text("PR, merge, local clean, deploy\n")
+    cli.main(["--greenfield", "--agent", "claude", str(repo)])
+    assert (repo / ".sprint-defaults").read_text() == "PR, merge, local clean, deploy\n"
+
+
+def test_the_seed_report_line_names_what_it_wrote(repo: Path, capsys):
+    cli.main(["--greenfield", "--agent", "claude", str(repo)])
+    out = capsys.readouterr().out
+    assert f"defaults : seeded .sprint-defaults ({cli.SPRINT_DEFAULTS})" in out
+
+
+def test_keeping_an_existing_defaults_file_is_reported_too(repo: Path, capsys):
+    (repo / ".sprint-defaults").write_text("PR, no merge\n")
+    cli.main(["--agent", "claude", str(repo)])
+    assert "defaults : kept existing .sprint-defaults" in capsys.readouterr().out
+
+
+def test_the_defaults_are_what_sprint_ship_documents(repo: Path):
+    """The file's whole contents become sprint-ship's $ARGUMENTS, so it is one line."""
+    assert cli.SPRINT_DEFAULTS == "PR, merge, local clean"
+    assert "\n" not in cli.SPRINT_DEFAULTS
+
+
+def test_sprint_deploy_is_never_seeded(repo: Path):
+    """Whether a repo deploys is a property of the repo, declared when its skill exists."""
+    cli.main(["--greenfield", "--agent", "claude", str(repo)])
+    assert not (repo / ".sprint-deploy").exists()
+
+
 # --- the `check` alias --------------------------------------------------------
 #
 # #1254: the managed block says `just check` runs the gates, but an existing

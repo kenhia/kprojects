@@ -72,6 +72,14 @@ cmake, `pyproject.toml` means python, anything else is other (checked in that
 order, so a repo carrying more than one marker gets the toolchain that owns
 its build). From a clone of this repo, `just apply ~/src/x` does the same.
 
+`--greenfield` says the target is a brand-new repo, and adds one thing: a
+`.sprint-defaults` seeded with `PR, merge, local clean`, so a bare
+`/sprint-ship` there does the whole ship. It never overwrites an existing one,
+and an established repo deliberately does not get it — that file is
+`sprint-ship`'s entire argument list, so seeding it would configure how a repo
+already shipping on its own terms ships. Every target gets the `.gitignore`
+line either way.
+
 - `src/kprojects/harness/` — the single source for shared conventions.
   `instructions.md` is what every project gets; `tooling/<stack>.md` is the
   stanza composed into it per stack; `justfile.<stack>` is the seeded gate.

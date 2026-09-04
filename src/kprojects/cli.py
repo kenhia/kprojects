@@ -57,7 +57,12 @@ STACK_MARKERS = (
     ("python", "pyproject.toml"),
 )
 
-BASE_IGNORES = (".scratch/", ".env")
+# sprint-ship reads this file's whole contents as its `$ARGUMENTS`, so it is one
+# line — and one constant serves both the seed and the report line that echoes
+# it, which is what keeps the two from drifting apart (#1855).
+SPRINT_DEFAULTS = "PR, merge, local clean"
+
+BASE_IGNORES = (".scratch/", ".env", ".sprint-defaults")
 STACK_IGNORES = {
     "python": (".venv/", "__pycache__/", ".pytest_cache/"),
     "rust": ("target/",),
@@ -253,6 +258,33 @@ def _seed(path: Path, template: str, label: str) -> None:
     print(f"layout   : seeded {label}")
 
 
+def ensure_sprint_defaults(target: Path, greenfield: bool) -> str | None:
+    """Seed `.sprint-defaults` on a greenfield target only (#1855).
+
+    A bare `/sprint-ship` should do the whole ship in a repo new-homelab-project
+    just stood up, instead of every repo discovering the file later — knarr,
+    kstudiodash and agent-skills each added theirs by hand mid-sprint.
+
+    Greenfield only, and never an overwrite. The file is per-person and
+    per-machine by sprint-ship's own rule, and an existing repo may already ship
+    differently, so seeding one there would configure its ship behaviour from a
+    guess — the thing sprint 006 declined to do with the `check` recipe. A
+    migration target gets the gitignore line and nothing else.
+
+    `.sprint-deploy` has no equivalent here on purpose: whether a repo deploys
+    is a property of the repo, declared when its deploy skill exists.
+
+    Returns "seeded", "kept", or None when nothing was written.
+    """
+    path = target / ".sprint-defaults"
+    if path.exists():
+        return "kept"
+    if not greenfield:
+        return None
+    path.write_text(SPRINT_DEFAULTS + "\n", encoding="utf-8")
+    return "seeded"
+
+
 def _recipe_names(text: str) -> set[str]:
     """The names `just <name>` will accept in this justfile.
 
@@ -330,7 +362,7 @@ def warn_old_harness(target: Path) -> None:
 # --- driver ------------------------------------------------------------------
 
 
-def apply(target: Path, agent: str, stack: str) -> None:
+def apply(target: Path, agent: str, stack: str, greenfield: bool = False) -> None:
     for d in LAYOUT_DIRS:
         (target / d).mkdir(parents=True, exist_ok=True)
     print(f"layout   : {' '.join(LAYOUT_DIRS)}")
@@ -345,6 +377,12 @@ def apply(target: Path, agent: str, stack: str) -> None:
 
     for entry in ensure_gitignore(target, stack):
         print(f"gitignore: added {entry}")
+
+    seeded = ensure_sprint_defaults(target, greenfield)
+    if seeded == "seeded":
+        print(f"defaults : seeded .sprint-defaults ({SPRINT_DEFAULTS})")
+    elif seeded == "kept":
+        print("defaults : kept existing .sprint-defaults")
 
     block = render_block(stack)
     for rel in AGENT_FILES[agent]:
@@ -369,6 +407,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="tooling stanza and justfile to apply (default: detect from the repo)",
     )
+    parser.add_argument(
+        "--greenfield",
+        action="store_true",
+        help="target is a new repo: also seed .sprint-defaults (never overwrites)",
+    )
     args = parser.parse_args(argv)
 
     target = Path(args.target).expanduser().resolve()
@@ -382,7 +425,7 @@ def main(argv: list[str] | None = None) -> int:
     origin = "given" if args.stack else "detected"
     print(f"stack    : {stack} ({origin})")
 
-    apply(target, args.agent, stack)
+    apply(target, args.agent, stack, args.greenfield)
     print(f"done     : kproject harness applied to {target}")
     return 0
 
