@@ -177,6 +177,58 @@ def test_creates_parent_directory_for_ghcp(repo: Path):
     assert (repo / ".github" / "copilot-instructions.md").is_file()
 
 
+# --- prettier-safe markers (#2509) -------------------------------------------
+
+
+@pytest.mark.parametrize("stack", cli.STACKS)
+def test_markers_are_separated_from_the_body_by_a_blank_line(stack: str):
+    """Prettier's markdown formatter wants a blank line on both marker lines.
+
+    Measured with kwebi's own prettier 3.9.5 (#2509): formatting a file carrying
+    the block produced exactly two edits — one after the begin marker, one
+    before the end marker — which is why `just check` went red on every kproject
+    repo whose gate lints markdown, at the moment the block was re-applied.
+
+    Emitting the blank lines here is what makes the block prettier-clean
+    everywhere, so no repo needs a `.prettierignore` entry for a region it is
+    forbidden to hand-correct anyway.
+    """
+    lines = cli.render_block(stack).split("\n")
+    assert lines[0] == cli.BEGIN_MARK
+    assert lines[1] == "", "prettier wants a blank line after the begin marker"
+    end = lines.index(cli.END_MARK)
+    assert lines[end - 1] == "", "prettier wants a blank line before the end marker"
+
+
+def test_a_written_agent_file_is_blank_line_separated_around_the_block(repo: Path):
+    """The same property on the file the installer actually writes."""
+    cli.main(["--agent", "claude", str(repo)])
+    lines = (repo / "CLAUDE.md").read_text().split("\n")
+    begin = next(i for i, ln in enumerate(lines) if ln.startswith(cli.BEGIN_PREFIX))
+    end = next(i for i, ln in enumerate(lines) if ln.startswith(cli.END_PREFIX))
+    assert lines[begin + 1] == ""
+    assert lines[end - 1] == ""
+    assert lines[end + 1] == "", "and one after the end marker, before the tail"
+
+
+def test_replacing_an_old_block_leaves_the_blank_lines(repo: Path):
+    """A repo carrying the bash installer's markers must come out clean too."""
+    # A sentinel, not a word: "stale" occurs legitimately inside the `other`
+    # tooling stanza, so asserting on it tests the stanza's prose, not the swap.
+    (repo / "CLAUDE.md").write_text(
+        f"{OLD_BEGIN}\nZZOLDBODYZZ\n{OLD_END}\n\n## Project\n\nZZMINEZZ\n"
+    )
+    cli.main(["--agent", "claude", str(repo)])
+    body = (repo / "CLAUDE.md").read_text()
+    lines = body.split("\n")
+    begin = next(i for i, ln in enumerate(lines) if ln.startswith(cli.BEGIN_PREFIX))
+    end = next(i for i, ln in enumerate(lines) if ln.startswith(cli.END_PREFIX))
+    assert lines[begin + 1] == ""
+    assert lines[end - 1] == ""
+    assert "ZZOLDBODYZZ" not in body
+    assert "ZZMINEZZ" in body
+
+
 # --- stack detection ---------------------------------------------------------
 
 
@@ -256,6 +308,69 @@ def test_detection_drives_the_block_when_no_flag_given(repo: Path):
     assert "cargo clippy --all-targets" in (repo / "CLAUDE.md").read_text()
 
 
+# --- subdirectory markers: report, never decide (#1289) -----------------------
+
+
+def test_subdirectory_markers_do_not_change_detection(repo: Path):
+    """The root-only rule is the rule. #1260 is why: a vendored dependency's
+    build system deeper in the tree must never pick the stack."""
+    (repo / "engine").mkdir()
+    (repo / "engine" / "pyproject.toml").write_text("[project]\n")
+    assert cli.detect_stack(repo) == "other"
+
+
+def test_finds_markers_one_and_two_levels_down(repo: Path):
+    """The hv-simulator shape: `engine/` and `tools/<name>/`, nothing at the top."""
+    (repo / "engine").mkdir()
+    (repo / "engine" / "pyproject.toml").write_text("[project]\n")
+    (repo / "tools" / "nav-planner").mkdir(parents=True)
+    (repo / "tools" / "nav-planner" / "pyproject.toml").write_text("[project]\n")
+    found = cli.find_subdirectory_markers(repo)
+    assert set(found) == {"python"}
+    assert "engine/pyproject.toml" in found["python"]
+    assert "tools/nav-planner/pyproject.toml" in found["python"]
+
+
+def test_subdirectory_scan_skips_build_output_and_vendored_trees(repo: Path):
+    """Exactly where a foreign build system's markers live, so exactly what
+    would make the hint misleading."""
+    for noise in ("node_modules", "target", ".venv", "vendor"):
+        (repo / noise).mkdir()
+        (repo / noise / "Cargo.toml").write_text("[package]\n")
+    assert cli.find_subdirectory_markers(repo) == {}
+
+
+def test_the_hint_names_the_paths_and_the_flag(repo: Path, capsys):
+    (repo / "engine").mkdir()
+    (repo / "engine" / "pyproject.toml").write_text("[project]\n")
+    cli.main(["--agent", "claude", str(repo)])
+    err = capsys.readouterr().err
+    assert "engine/pyproject.toml" in err
+    assert "--stack python" in err
+    assert "root" in err
+
+
+def test_the_hint_is_silent_when_the_root_decides(repo: Path, capsys):
+    (repo / "Cargo.toml").write_text("[package]\n")
+    (repo / "engine").mkdir()
+    (repo / "engine" / "pyproject.toml").write_text("[project]\n")
+    cli.main(["--agent", "claude", str(repo)])
+    assert "--stack python" not in capsys.readouterr().err
+
+
+def test_the_hint_is_silent_when_the_user_passed_stack(repo: Path, capsys):
+    """Nothing to report: they already answered the question it asks."""
+    (repo / "engine").mkdir()
+    (repo / "engine" / "pyproject.toml").write_text("[project]\n")
+    cli.main(["--stack", "other", "--agent", "claude", str(repo)])
+    assert "--stack python" not in capsys.readouterr().err
+
+
+def test_a_plain_other_repo_says_nothing(repo: Path, capsys):
+    cli.main(["--agent", "claude", str(repo)])
+    assert "below it" not in capsys.readouterr().err
+
+
 # --- gitignore ---------------------------------------------------------------
 
 
@@ -297,6 +412,50 @@ def test_gitignore_preserves_existing_entries(repo: Path):
     (repo / ".gitignore").write_text("mine/\n")
     cli.ensure_gitignore(repo, "other")
     assert "mine/" in (repo / ".gitignore").read_text().splitlines()
+
+
+def test_cargos_own_target_line_is_not_duplicated(repo: Path):
+    """#1288: all five tier-1 Rust repos gained a second ignore for one directory.
+
+    `cargo new` writes `/target`; this installer wants `target/`. Byte comparison
+    says they differ, a reader says they are the same directory, and the file the
+    installer edits on the user's behalf ended up saying it twice.
+    """
+    (repo / ".gitignore").write_text("# Added by cargo\n\n/target\n")
+    added = cli.ensure_gitignore(repo, "rust")
+    assert "target/" not in added
+    lines = (repo / ".gitignore").read_text().splitlines()
+    assert lines.count("target/") == 0, "cargo's own line is left alone"
+    assert lines.count("/target") == 1
+
+
+@pytest.mark.parametrize("spelling", ["target/", "/target", "/target/", "target"])
+def test_every_spelling_of_one_directory_counts_as_present(repo: Path, spelling: str):
+    (repo / ".gitignore").write_text(f"{spelling}\n")
+    assert "target/" not in cli.ensure_gitignore(repo, "rust")
+
+
+def test_a_different_directory_is_still_added(repo: Path):
+    """The comparison must not be so loose that it swallows a real gap."""
+    (repo / ".gitignore").write_text("/targets\n")
+    assert "target/" in cli.ensure_gitignore(repo, "rust")
+
+
+def test_a_negation_is_not_mistaken_for_the_pattern(repo: Path):
+    """`!target` un-ignores; it is the opposite of `target/`, not a spelling of it."""
+    (repo / ".gitignore").write_text("!target\n")
+    assert "target/" in cli.ensure_gitignore(repo, "rust")
+
+
+def test_the_cargo_repro_from_the_work_item(repo: Path):
+    """#1288's own reproduce steps, as the shape kaed's .gitignore ended up in."""
+    (repo / ".gitignore").write_text(
+        ".scratch/\n.env\n.korg-sprint-proposal\n\n\n# Added by cargo\n\n/target\n"
+    )
+    cli.ensure_gitignore(repo, "rust")
+    body = (repo / ".gitignore").read_text()
+    assert "target/\n" not in body.replace("/target\n", "")
+    assert body.count("target") == 1
 
 
 # --- layout and seeds --------------------------------------------------------

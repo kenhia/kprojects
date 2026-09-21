@@ -1,4 +1,5 @@
 <!-- kproject:begin — managed by kprojects; do not edit inside this block -->
+
 ## kproject conventions
 
 This project uses the kproject minimal harness
@@ -50,6 +51,7 @@ over ceremony.
 - Python managed by `uv`; lint/format with `ruff`; typecheck with `ty`
   (astral toolchain)
 - License is MIT unless specifically directed otherwise
+
 <!-- kproject:end -->
 
 ## Project
@@ -77,6 +79,16 @@ kprojects is the harness itself: single-source agent conventions plus the
   deliberately last, since it also appears carrying nothing but ruff config,
   and `CMakeLists.txt` sits below cargo/go because CMake is often a vendored
   dependency's build system inside those.
+- Detection reads the **root only**, and when that settles for `other` the
+  installer *reports* what it found below (`find_subdirectory_markers`,
+  depth 2, skipping `SCAN_SKIP_DIRS`) and names the `--stack` flag that would
+  pick it — it never falls back a level (#1289). hv-simulator is the shape:
+  five `pyproject.toml` under `engine/` and `tools/*`, none at the top. Falling
+  back was declined because #1260 already established that a vendored
+  dependency's build system must not choose a stack, and from outside the repo
+  a `Cargo.toml` in `third_party/` is indistinguishable from one in `engine/`.
+  Same move as `NO_GATE_WARNING`: name the consequence and the lever, write
+  nothing.
 - Every seeded gate must fail when it has nothing to assert. Each stack has
   its own way of not doing that: `gofmt -l` exits 0 and prints (003), `clippy`
   skips test targets without `--all-targets`, and `ctest` exits 0 on "No tests
@@ -91,6 +103,18 @@ kprojects is the harness itself: single-source agent conventions plus the
 - Block markers are matched on the `<!-- kproject:begin` **prefix**, never
   the full line, so repos carrying a block from the retired `install.sh`
   re-apply cleanly with no migration step.
+- `render_block` emits a **blank line after the begin marker and before the
+  end marker** (#2509). Not cosmetic: prettier's markdown formatter inserts
+  exactly those two, so without them every kproject repo whose gate lints
+  markdown went red the moment the block was re-applied — kwebi's `just check`
+  was red on `main` for a run of sprints. A repo cannot fix it locally either;
+  the block forbids editing inside it and a re-apply would revert the edit.
+  Verified against kwebi's own prettier (3.9.5), defaults and its config alike.
+- `ensure_gitignore` compares entries by `_ignore_key` — stripped of
+  whitespace and leading/trailing `/` — so cargo's `/target` is recognised as
+  already covering `target/` and no second line is appended (#1288). It folds
+  the four spellings of one directory (`x`, `x/`, `/x`, `/x/`) and leaves a
+  `!x` negation distinct, since that is the opposite rule and not a spelling.
 - An existing justfile is never overwritten, but the managed block promises
   `just check` — so when a repo's gate goes by another name the installer
   appends a `check: <gate>` alias, picking by `GATE_RECIPES` priority
