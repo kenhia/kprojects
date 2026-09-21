@@ -70,7 +70,10 @@ python|rust|go|cmake|other`. Leave `--stack` off and the target repo is
 inspected — `Cargo.toml` means rust, `go.mod` means go, `CMakeLists.txt` means
 cmake, `pyproject.toml` means python, anything else is other (checked in that
 order, so a repo carrying more than one marker gets the toolchain that owns
-its build). From a clone of this repo, `just apply ~/src/x` does the same.
+its build). Only the repo **root** is inspected; when that yields nothing but
+a subdirectory has markers, the installer says what it found and which
+`--stack` would pick it, rather than guessing on your behalf. From a clone of
+this repo, `just apply ~/src/x` does the same.
 
 `--greenfield` says the target is a brand-new repo, and adds one thing: a
 `.sprint-defaults` seeded with `PR, merge, local clean`, so a bare
@@ -94,7 +97,10 @@ line either way.
 - The installer is idempotent and mechanical: layout dirs, seed
   `roadmap.md`/`justfile`, `.gitignore` entries, block injection, and warnings
   when old-harness paths (`.specify/`, `specs/`, ...) are present. It preserves
-  CRLF line endings, so a Windows checkout survives re-application.
+  CRLF line endings, so a Windows checkout survives re-application. A
+  `.gitignore` entry you already have under an equivalent spelling is left
+  alone rather than duplicated — cargo's `/target` is not joined by a
+  `target/`.
 - An existing `justfile` is never overwritten. Since the managed block tells
   every agent that `just check` runs the gates, a repo whose gate is named
   `gate`, `ci` or `all` instead gets a one-line `check: <gate>` alias appended

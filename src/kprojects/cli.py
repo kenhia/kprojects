@@ -57,12 +57,42 @@ STACK_MARKERS = (
     ("python", "pyproject.toml"),
 )
 
+# Directories `find_subdirectory_markers` never descends into (#1289). Build
+# output, vendored dependencies and virtualenvs are exactly where a *foreign*
+# build system's markers live — the thing #1260 established must never pick a
+# stack — so they must not clutter a hint about this repo's own shape either.
+SCAN_SKIP_DIRS = frozenset(
+    {
+        ".venv",
+        "venv",
+        "node_modules",
+        "target",
+        "build",
+        "dist",
+        "vendor",
+        "third_party",
+        "__pycache__",
+        "site-packages",
+    }
+)
+
+# How far below the root the report-only scan looks. hv-simulator — the repo
+# that raised #1289 — keeps its Python in `engine/` and `tools/<name>/`, so it
+# takes two levels to see the shape at all.
+SCAN_DEPTH = 2
+
 # sprint-ship reads this file's whole contents as its `$ARGUMENTS`, so it is one
 # line — and one constant serves both the seed and the report line that echoes
 # it, which is what keeps the two from drifting apart (#1855).
 SPRINT_DEFAULTS = "PR, merge, local clean"
 
-BASE_IGNORES = (".scratch/", ".env", ".sprint-defaults")
+# `.korg-sprint-proposal` is written by start-sprint at the repo root and must
+# never be committed, so the installer owns its ignore line (#2990). Same split
+# #1855 settled for `.sprint-defaults`: the installer already owns the ignore
+# set for harness-written files, and only the *contents* of a seeded file are a
+# per-repo decision. Repos were acquiring this line by hand (kprojects, kaed)
+# until it landed here. The fleet-visible effect arrives with #1409's re-apply.
+BASE_IGNORES = (".scratch/", ".env", ".sprint-defaults", ".korg-sprint-proposal")
 STACK_IGNORES = {
     "python": (".venv/", "__pycache__/", ".pytest_cache/"),
     "rust": ("target/",),
@@ -167,8 +197,15 @@ def render_block(stack: str) -> str:
         else:
             lines.append(line)
 
-    body = "\n".join(lines)
-    return BEGIN_MARK + "\n" + body + END_MARK + "\n"
+    body = "\n".join(lines).strip("\n")
+    # The blank lines inside the markers are not cosmetic (#2509). Prettier's
+    # markdown formatter inserts exactly these two, and a repo whose gate lints
+    # markdown cannot correct them itself: the block's own first line forbids
+    # editing inside it, and the next re-apply would revert the edit anyway —
+    # which is precisely how kwebi's `just check` came to be red on main for a
+    # run of sprints. Emitting them here is what makes the block prettier-clean
+    # in every repo at once, instead of N `.prettierignore` entries that drift.
+    return BEGIN_MARK + "\n\n" + body + "\n\n" + END_MARK + "\n"
 
 
 # --- text i/o that survives a Windows checkout -------------------------------
@@ -237,13 +274,105 @@ def detect_stack(target: Path) -> str:
     return "other"
 
 
+def find_subdirectory_markers(target: Path, depth: int = SCAN_DEPTH) -> dict[str, list[str]]:
+    """Stack markers *below* the root, as `{stack: [relative paths]}` (#1289).
+
+    Report-only, and deliberately so: `detect_stack` still looks at the root and
+    nothing else. This exists so a repo whose build files sit a level or two down
+    — hv-simulator has five `pyproject.toml` files under `engine/` and `tools/*`
+    and none at the top — is *told* which `--stack` would pick it, rather than
+    silently getting `other` and the wrong tooling stanza.
+
+    Returned in `STACK_MARKERS` priority order so the output is deterministic.
+    """
+    marker_stacks = {marker: stack for stack, marker in STACK_MARKERS}
+    found: dict[str, list[str]] = {}
+    frontier = [target]
+    for _ in range(depth):
+        nxt: list[Path] = []
+        for parent in frontier:
+            try:
+                children = sorted(c for c in parent.iterdir() if c.is_dir())
+            except OSError:
+                # An unreadable directory is not a reason to fail an install.
+                continue
+            for child in children:
+                if child.name.startswith(".") or child.name in SCAN_SKIP_DIRS:
+                    continue
+                for marker, stack in marker_stacks.items():
+                    if (child / marker).is_file():
+                        rel = (child / marker).relative_to(target)
+                        found.setdefault(stack, []).append(rel.as_posix())
+                nxt.append(child)
+        frontier = nxt
+    return {stack: found[stack] for stack, _ in STACK_MARKERS if stack in found}
+
+
+def warn_subdirectory_markers(target: Path) -> None:
+    """Say what is below the root instead of silently settling for `other` (#1289).
+
+    A report, never a decision. Falling back a level was the considered
+    alternative and was declined: #1260 established that a vendored dependency's
+    build system must not choose the stack, and from the outside a `Cargo.toml`
+    in `third_party/` looks exactly like one in `engine/`. Only the repo knows.
+
+    So this follows NO_GATE_WARNING's precedent — name what was found and the
+    lever that acts on it, and write nothing.
+    """
+    found = find_subdirectory_markers(target)
+    if not found:
+        return
+
+    print(
+        "WARN     : no build marker at the repo root, so the stack is `other` —"
+        " but markers were found below it:",
+        file=sys.stderr,
+    )
+    for stack, paths in found.items():
+        shown = ", ".join(paths[:3])
+        more = f" (+{len(paths) - 3} more)" if len(paths) > 3 else ""
+        print(f"WARN     :   {stack}: {shown}{more}", file=sys.stderr)
+    flags = " or ".join(f"`--stack {s}`" for s in found)
+    print(
+        f"WARN     : if that is what this repo is, re-run with {flags} —"
+        " detection reads the root only, on purpose, and will not guess.",
+        file=sys.stderr,
+    )
+
+
 # --- layout, seeds, gitignore ------------------------------------------------
+
+
+def _ignore_key(pattern: str) -> str:
+    """Normalise a .gitignore line so equivalent spellings compare equal (#1288).
+
+    `cargo new` writes `/target`; this installer wants `target/`. They are not
+    byte-identical and not *exactly* equivalent — `/target` is root-only,
+    `target/` matches at any depth — but they name one directory with one
+    intent, and comparing bytes meant every Rust re-apply appended a second line
+    for it. All five tier-1 Rust repos ended up carrying both, in a file the
+    installer edits on the user's behalf, with nothing to tell a reader it was
+    deliberate rather than a bug.
+
+    Stripping the anchoring and trailing slash is the cheapest comparison that
+    folds the four spellings of one directory (`x`, `x/`, `/x`, `/x/`) together
+    while leaving genuinely different patterns — including a `!x` negation,
+    which is the opposite of the rule, not a spelling of it — distinct.
+    """
+    return pattern.strip().strip("/")
 
 
 def ensure_gitignore(target: Path, stack: str) -> list[str]:
     path = target / ".gitignore"
     existing = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
-    added = [e for e in (*BASE_IGNORES, *STACK_IGNORES[stack]) if e not in existing]
+    have = {_ignore_key(line) for line in existing if line.strip()}
+    added: list[str] = []
+    for entry in (*BASE_IGNORES, *STACK_IGNORES[stack]):
+        key = _ignore_key(entry)
+        if key in have:
+            continue
+        have.add(key)
+        added.append(entry)
     if added:
         body = "\n".join(existing + added) + "\n"
         path.write_text(body.lstrip("\n"), encoding="utf-8")
@@ -424,6 +553,10 @@ def main(argv: list[str] | None = None) -> int:
     stack = args.stack or detect_stack(target)
     origin = "given" if args.stack else "detected"
     print(f"stack    : {stack} ({origin})")
+    # Only when detection settled for `other` on its own: a `--stack` on the
+    # command line has already answered the question this would ask.
+    if not args.stack and stack == "other":
+        warn_subdirectory_markers(target)
 
     apply(target, args.agent, stack, args.greenfield)
     print(f"done     : kproject harness applied to {target}")

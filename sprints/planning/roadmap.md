@@ -16,9 +16,18 @@
   instructing agents to use `uv`, `ruff` and `ty`. Closing audit: zero
   `OLD-INSTALLER` rows on kai and cleo; the two on kubs0 are the duplicate
   clone that should be dropped and a checkout sitting on a pre-merge branch.
-  What is left is the two batch-5 slices (kdeskdash #1280, kpidash #1279) and
-  the installer warts the pass surfaced — the duplicate `target/` gitignore
-  line, and detection not seeing subdirectory stack markers.
+  What is left is the two batch-5 slices (kdeskdash #1280, kpidash #1279).
+  The installer warts the pass surfaced are **fixed in sprint 010**: the
+  duplicate `target/` gitignore line (#1288) and detection not reporting
+  subdirectory stack markers (#1289).
+
+- **Installer papercuts done (sprint 010).** Also fixed the managed block's
+  prettier problem (#2509) — the block now carries a blank line inside each
+  marker, so a repo whose gate lints markdown stays green through a re-apply
+  instead of going red at it. That was blocking the fleet re-apply (#1409),
+  which is still to run and is the way all three fixes actually reach the
+  fleet — a repo keeps whatever block and ignore set it has until it is
+  re-applied.
 
 - **Cross-project-plan pointer in the block (sprint 008).** Nine conditional
   lines: grep `cross-project-planning/index.md` for your project, and only
