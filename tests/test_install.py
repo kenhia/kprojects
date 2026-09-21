@@ -381,6 +381,23 @@ def test_gitignore_gets_base_entries(repo: Path):
     assert ".env" in lines
 
 
+def test_gitignore_gets_the_sprint_marker(repo: Path):
+    """`.korg-sprint-proposal` is written by start-sprint and must never be
+    committed, so the installer owns its ignore line — the same split #1855
+    settled for `.sprint-defaults` (#2990)."""
+    cli.ensure_gitignore(repo, "other")
+    assert ".korg-sprint-proposal" in (repo / ".gitignore").read_text().splitlines()
+
+
+def test_a_repo_that_added_the_marker_by_hand_gains_nothing(repo: Path):
+    """kprojects and kaed both carry the line already; a re-apply must not
+    append a second one. This is #1288's comparison doing the work."""
+    (repo / ".gitignore").write_text(".korg-sprint-proposal\n")
+    assert ".korg-sprint-proposal" not in cli.ensure_gitignore(repo, "other")
+    lines = (repo / ".gitignore").read_text().splitlines()
+    assert lines.count(".korg-sprint-proposal") == 1
+
+
 def test_gitignore_gets_stack_entries(repo: Path):
     cli.ensure_gitignore(repo, "python")
     lines = (repo / ".gitignore").read_text().splitlines()

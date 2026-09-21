@@ -115,6 +115,12 @@ kprojects is the harness itself: single-source agent conventions plus the
   already covering `target/` and no second line is appended (#1288). It folds
   the four spellings of one directory (`x`, `x/`, `/x`, `/x/`) and leaves a
   `!x` negation distinct, since that is the opposite rule and not a spelling.
+- `BASE_IGNORES` carries `.korg-sprint-proposal` (#2990). start-sprint writes
+  that file at the repo root and its own rule is that it must never be
+  committed, so the installer owns the ignore line — the same split #1855
+  settled for `.sprint-defaults`: the installer owns the ignore set for
+  harness-written files, and only a seeded file's *contents* are a per-repo
+  decision. Repos were adding it by hand until then (kprojects, kaed).
 - An existing justfile is never overwritten, but the managed block promises
   `just check` — so when a repo's gate goes by another name the installer
   appends a `check: <gate>` alias, picking by `GATE_RECIPES` priority

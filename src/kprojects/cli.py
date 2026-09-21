@@ -86,7 +86,13 @@ SCAN_DEPTH = 2
 # it, which is what keeps the two from drifting apart (#1855).
 SPRINT_DEFAULTS = "PR, merge, local clean"
 
-BASE_IGNORES = (".scratch/", ".env", ".sprint-defaults")
+# `.korg-sprint-proposal` is written by start-sprint at the repo root and must
+# never be committed, so the installer owns its ignore line (#2990). Same split
+# #1855 settled for `.sprint-defaults`: the installer already owns the ignore
+# set for harness-written files, and only the *contents* of a seeded file are a
+# per-repo decision. Repos were acquiring this line by hand (kprojects, kaed)
+# until it landed here. The fleet-visible effect arrives with #1409's re-apply.
+BASE_IGNORES = (".scratch/", ".env", ".sprint-defaults", ".korg-sprint-proposal")
 STACK_IGNORES = {
     "python": (".venv/", "__pycache__/", ".pytest_cache/"),
     "rust": ("target/",),

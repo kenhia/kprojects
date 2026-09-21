@@ -91,16 +91,17 @@ plan applies.
   - `SCAN_SKIP_DIRS`, `SCAN_DEPTH`, `find_subdirectory_markers`,
     `warn_subdirectory_markers`, called from `main` only when detection chose
     `other` unaided (#1289).
-- `tests/test_install.py` — 22 tests across three new sections: prettier-safe
+  - `.korg-sprint-proposal` added to `BASE_IGNORES` (#2990, see below).
+- `tests/test_install.py` — 24 tests across three new sections: prettier-safe
   markers, subdirectory markers as report-not-decision, and gitignore
-  equivalence. 105 tests, from 83.
+  equivalence (including the two for #2990). 107 tests, from 83.
 - `CLAUDE.md`, `.github/copilot-instructions.md` — the managed block
-  regenerated via `just apply-self`, plus three new Project bullets recording
+  regenerated via `just apply-self`, plus four new Project bullets recording
   the behaviour and its reasoning, identical in both files.
 
 ## Verification
 
-`just check` green — ruff format, ruff check, ty, 105 tests.
+`just check` green — ruff format, ruff check, ty, 107 tests.
 
 Every new test was watched failing first: 15 failures on the first run, with
 `target/` (the byte-identical spelling) and the "detection is unchanged" test
@@ -122,17 +123,39 @@ all live — the host that would do the work.
 
 ## Repaired in passing
 
-Nothing. The gate was green on `main` at branch time and no pre-existing
-defect surfaced while working these three.
+**#2990 — `.korg-sprint-proposal` added to `BASE_IGNORES`.** `start-sprint`
+writes that file at the root of every repo it starts a sprint in, and its own
+instructions say it must never be committed — yet the installer did not ignore
+it, so repos acquired the line by hand (this repo at `.gitignore:3`, and kaed's
+as quoted in #1288).
+
+Filed first, deliberately, because the repair test looked unsettled from here:
+either `kproject-install` owns the ignore line for a file `start-sprint`
+writes, or `start-sprint` does. **The overseer read it the other way and made
+the call**, which is recorded for Ken in the program report: the installer
+already owns the ignore set for harness-written files, and **#1855 settled
+exactly this split for `.sprint-defaults`** — the ignore line is
+unconditional, only a seeded file's *contents* are a per-repo decision. That
+precedent removes the fork, so it is a repair and it landed here.
+
+One constant and two tests: the marker appears for a fresh repo, and a repo
+that already added it by hand gains nothing — the latter exercising #1288's
+new comparison on the real case. `just apply-self` on this repo confirmed it:
+no `gitignore: added` line, `.gitignore` byte-unchanged.
+
+**The fleet-visible effect arrives with #1409's re-apply**, not now. That is
+the same delivery path as the #2509 block fix in this sprint, and it is fine:
+until a repo is re-applied it simply keeps whatever it has, which for the two
+known cases is the correct line already.
+
+Nothing else. The gate was green on `main` at branch time and no other
+pre-existing defect surfaced while working these three.
 
 ## Follow-ups
 
-- **#2990** (filed) — `.korg-sprint-proposal` is not in `BASE_IGNORES`, so
-  repos keep adding the line by hand (this repo and kaed both have it). Filed
-  rather than repaired because it needs a decision this sprint cannot make:
-  whether `kproject-install` owns the ignore line for a file `start-sprint`
-  writes, or `start-sprint` does. Adding it to `BASE_IGNORES` would change
-  what lands in every kproject repo on its next re-apply.
+- **#2990** — filed during this sprint, then **resolved in it** once the
+  overseer made the call. See "Repaired in passing" above; it is not
+  outstanding.
 - **#1409** — the fleet re-apply pass was explicitly outside this sprint, and
   its prettier blocker is now cleared. Commented there to say so: repos
   re-applied before this sprint carry a block that reds a markdown-linting
