@@ -41,8 +41,19 @@ also prettier-clean (#2509).
   had no karc legs (`karc list --json` → `legs: []`), and both were clean and
   synced with no open PRs. The operation was the same mechanical one. This
   extends the brief, and it is flagged to the overseer.
-- **The post-pointer, pre-010 repos were left alone.** See *What the pass
-  found*. They are outside "pre-pointer", and this leg holds no lock on them.
+- **The post-pointer, pre-010 repos were folded in on a second turn.** At
+  first they were left alone, as outside "pre-pointer" and unlocked by this
+  leg. The overseer ruled that a block differing from what the installer
+  writes today is not re-applied, so the twelve got the same mechanical pass.
+  See *Second pass*. The overseer also ruled k-homelab, agent-skills and
+  kyac's backup file as in scope / correct to leave.
+- **kdashdata kept its `other` stanza (`--stack other`).** Its root has had a
+  `CMakeLists.txt` since `a291ba1`. But the `other` block was scaffolded at
+  `34fad8f`, before the C library existed, so that was never an override.
+  Plain detection would now swap it to the `cmake` stanza. For a polyglot
+  repo (docs, Python, Rust and C, with one `just check` over all four), that
+  changes the guidance agents get, so it is a decision, not a refresh. This
+  pass keeps the block's text and flags the stanza question instead.
 
 ## The re-apply pass
 
@@ -92,24 +103,64 @@ installer's own harness-file ignore: `.sprint-defaults` everywhere, plus
 Merge readiness, checked before the ship: no branch is protected, no repo has
 `CODEOWNERS`, and no repo's `CLAUDE.md` says its PRs need Ken.
 
-### Before / after — repos still pre-pointer
+### Second pass — 12 repos with the pointer but not sprint 010's block
 
-| Host | Before | After the ship (if all 19 merge) |
+The same rules applied. `karc list --json` was checked on each host first:
+kai held only `kloom-900340` and kubs0 held nothing. All twelve were clean,
+synced, unlocked and had no open PRs, so none was skipped. Every diff is
+010's two blank lines, +2 per agent file, plus the installer's ignore lines
+where a repo lacked them. Insertions only. Second run a no-op.
+
+| Repo | Host | Stack | PR | Diff | Gate |
+|---|---|---|---|---|---|
+| kfdc | kai | other | [#35](https://github.com/kenhia/kfdc/pull/35) | +4, 2 files | green |
+| ktail | kai | go | [#1](https://github.com/kenhia/ktail/pull/1) | +6, 3 files | green |
+| kfo | kai | other | [#7](https://github.com/kenhia/kfo/pull/7) | +5, 3 files | green |
+| kpolice | kai | rust | [#5](https://github.com/kenhia/kpolice/pull/5) | +5, 3 files | green |
+| kdashdata | kai | other (`--stack`) | [#21](https://github.com/kenhia/kdashdata/pull/21) | +5, 3 files | green |
+| klaude-top | kai | go | [#6](https://github.com/kenhia/klaude-top/pull/6) | +4, 2 files | green |
+| korg | kai | rust | [#108](https://github.com/kenhia/korg/pull/108) | +4, 2 files | green |
+| kapollo | kai | rust | [#14](https://github.com/kenhia/kapollo/pull/14) | +5, 3 files | green |
+| kpidash | kai | cmake (`--stack`) | [#31](https://github.com/kenhia/kpidash/pull/31) | +4, 2 files | green |
+| karc | kai | rust | [#14](https://github.com/kenhia/karc/pull/14) | +4, 2 files | green |
+| kagviz | kai | rust | [#17](https://github.com/kenhia/kagviz/pull/17) | +4, 2 files | green |
+| khlenv | kubs0 | rust | [#5](https://github.com/kenhia/khlenv/pull/5) | +5, 3 files | green |
+
+karc's `check` recipe is `cargo fmt --check`, `clippy` and `test`. Nothing
+was installed, redeployed or restarted.
+
+**A trap the first pass did not hit:** kfdc, kfo and korg still had
+`chore/kproject-reapply` on origin from sprint 008. Each tip was exactly the
+head of the already-merged #13 / #2 / #66. The push was rejected, and
+`gh pr create` then attached to the stale remote branch, opening kfdc#34,
+kfo#6 and korg#107. Each of those re-proposed 008's commit and would have
+duplicated the pointer if merged. All three were closed with a comment. The
+stale ref was replaced with `--force-with-lease` pinned to that exact SHA,
+and fresh PRs (#35, #7, #108) were opened. This is a reason for the ship turn
+to delete each branch after merging.
+
+### Before / after
+
+| Host | Before (pre-pointer / pointer but pre-010) | After the ship (if all 31 merge) |
 |---|---|---|
-| kai | 14 (+ harness-eval, skipped by brief) | 0 (+ harness-eval) |
-| kubs0 | 5 (+ khound, skipped — stopped) | 0 (+ khound) |
-| cleo | not audited | not audited |
+| kai | 14 / 11 (+ harness-eval, skipped by brief) | 0 / 0 — all 76 agent files across 38 repos identical (+ harness-eval) |
+| kubs0 | 5 / 1 (+ khound, skipped — stopped) | 0 / 0 — 14 of 16 agent files identical; the other two are khound |
+| cleo | not audited | not audited — the overseer checks it from cleo |
+
+The "after" column was measured on the PR branches with the same block-hash
+audit, over `~/src` plus `~/k-homelab`, excluding `.scratch/`, harness-eval
+fixtures and the vendored `lib/kdashdata` submodules.
 
 ## What the pass found
 
-- **The fleet is still not byte-identical after this pass.** 11 repos on kai
-  (kfdc, ktail, kfo, kpolice, kdashdata, klaude-top, korg, kapollo, kpidash,
-  karc, kagviz) and khlenv on kubs0 carry the pointer but predate sprint 010.
-  Their block differs from the current one only by 010's two blank lines
-  inside the markers. That matters only where a gate runs prettier over
-  markdown, but it is still #1254's property false in 12 repos. A second
-  mechanical pass would close it. It is outside this brief, and this leg
-  holds no locks on those repos, so the routing is the overseer's call.
+- **The `lib/kdashdata` submodules in kdeskdash and kpidash** are pinned at
+  `4837473` and carry kdashdata's pre-010 block. They will stay that way
+  until each repo bumps its submodule pin. That is a dependency change for
+  those repos, so it was not done here. They are vendored copies, not repos
+  agents work in.
+- **kdashdata's stanza** — whether its `other` stanza should become `cmake`.
+  See Decisions. This is a question for whoever owns kdashdata's guidance,
+  not a re-apply.
 - **The triage audit's root misses `~/k-homelab`** on kubs0. Any future
   closing audit should search `~/src` *and* `~/k-homelab` (kaed's
   `kubs0:k-homelab` root names it).
@@ -120,14 +171,14 @@ Merge readiness, checked before the ship: no branch is protected, no repo has
 - **`.scratch` copies carry old blocks** (krot `proof-017`, korg `097`,
   k-homelab `.scratch/kmon`). They are ignored and ephemeral, so not a
   defect, but an audit that does not exclude `.scratch` will count them.
-- **cleo was not audited** (out of scope). korg-vs is the one cleo repo
-  known to carry a block, from sprint 007's 2026-08-15 pass. That pass came
-  before 008, so korg-vs is likely pre-pointer. This is unverified.
+- **cleo was not audited** (out of scope; the overseer checks it from cleo).
+  korg-vs is likely pre-pointer: its last re-apply was sprint 007's, which
+  came before 008.
 
 ## Verification
 
 Each repo's own `just check` was run on the branch, after the change, and all
-19 were green. The Rust and CMake gates finished in seconds, so their logs
+31 were green. The Rust and CMake gates finished in seconds, so their logs
 were read to confirm that real test runs had happened against warm caches.
 kprojects' own `just check` is green with this record added. No installer
 change was needed.
