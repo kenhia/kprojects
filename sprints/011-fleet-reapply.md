@@ -182,3 +182,22 @@ Each repo's own `just check` was run on the branch, after the change, and all
 were read to confirm that real test runs had happened against warm caches.
 kprojects' own `just check` is green with this record added. No installer
 change was needed.
+
+## Landed
+
+On the ship turn, all 31 PRs were squash-merged after the overseer's
+clearance (korg:4453 comment 4523). CI ran green on every repo that has it
+before its merge: klams#63, korg#108 (rust 12m27s), klams-view#7, kpolice#5,
+kapollo#14 and kagviz#17. korg's CI is check-only, and nothing was built,
+deployed or restarted in any repo. Each host checkout was switched to `main`
+and fast-forwarded, and `chore/kproject-reapply` was deleted locally and on
+origin, per the overseer's ruling for these side PRs. Every checkout reads
+`## main...origin/main`, and none has an open PR of this sprint's.
+
+The block audit was re-run on merged `main`, over `~/src` plus `~/k-homelab`
+on both hosts. On kai, 76 agent files in 38 repos are identical. On kubs0,
+14 of 16 are identical, and the other 2 are khound, which was skipped. With
+harness-eval also skipped, no repo on either host is pre-pointer or pre-010.
+The overseer ruled that kdashdata keeps its `other` stanza, and that the
+`lib/kdashdata` submodule copies pick up the block when their pins are next
+bumped.
